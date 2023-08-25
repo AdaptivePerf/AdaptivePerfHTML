@@ -25,10 +25,10 @@ def get_tree(identifier):
 
 @app.post('/<identifier>/')
 def post(identifier):
-    if 'tree' in request.identifier:
+    if 'tree' in request.values:
         return get_tree(identifier)
     else:
-        return ''
+        return '', 400
 
 @app.route('/')
 def main():
