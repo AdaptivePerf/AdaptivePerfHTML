@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SYCLOPS profiling</title>
+    <link type="text/css" rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css" />
+    <script type="application/javascript"
+            src="https://code.jquery.com/jquery-3.7.0.min.js"
+	    integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g="
+            crossorigin="anonymous"></script>
+    <script type="application/javascript"
+            src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/jstree.min.js"></script>
+    <script type="application/javascript">
+      $(document).on('change', '#results_combobox', function() {
+          $('#results_combobox option:selected').each(function() {
+              var value = $(this).val();
+              $.ajax({
+                  url: value + "/",
+                  method: 'POST',
+                  data: {tree: true}
+              }).done(function(result) {
+                  $('#thread_tree').attr('result_id', value);
+                  $('#thread_tree').html(result);
+                  $('#thread_tree').jstree();
+                  $('#thread_tree').jstree('open_all');
+                  $('#thread_tree').on('select_node.jstree', function (e, data) {
+                      $('#svg').attr('data', $('#thread_tree').attr('result_id') + '/' + data.node.text.split(' ')[0].replace('/', '_') + '.svg');
+                  });
+              }).fail(function(ajax_obj) {
+                  alert('Could not obtain the thread tree! (HTTP code ' + ajax_obj.status + ')');
+              });
+          });
+      });
+
+      function onSVGLoad() {
+          $('#no_flamegraph').hide();
+          var svg = document.getElementById('flamegraph');
+          svg.scrollTop = svg.scrollHeight;
+      }
+
+      function onSVGError() {
+          if ($('#svg').attr('data') != '') {
+              $('#no_flamegraph').show();
+          }
+      }
+    </script>
+    <style type="text/css">
+      html, body { height:100%; }
+      body { font-family:Arial; background-color:grey; display:flex; align-items:center; justify-content:center; height:100%; overflow:hidden; }
+      #block { height:75vh; display:flex; }
+      #main { height:90vh; width:90vw; max-height:90vh; max-width:90vw; padding:10px; border-radius:10px; background-color:white; }
+      #thread_tree { margin-right:10px; flex:1; }
+      #flamegraph { flex:2; text-align:center; }
+      .scrollable { overflow-y:scroll; }
+      object { max-width:100%; }
+      #header { text-align:center; margin-bottom:20px; }
+      #results_combobox { font-size:18px; min-width:50%; }
+      #no_flamegraph { display:none; }
+    </style>
+  </head>
+  <body>
+    <div id="main">
+      <div id="header">
+        <h1>Profiling results</h1>
+        <noscript>
+          <h2>You must have JavaScript enabled in order to use this page!</h2>
+        </noscript>
+        <select name="results" id="results_combobox" autocomplete="off">
+          <option value="" selected="selected" disabled="disabled">Please select a test executed by the CI...</option>
+          {% for x in ids %}
+          <option value="{{ x.value }}">{{ x }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div id="block">
+        <div id="thread_tree" class="scrollable">
+          
+        </div>
+        <div id="flamegraph" class="scrollable">
+          <p id="no_flamegraph">There is no flame graph associated with the selected thread! This may be caused by the running time of the thread being too short for the profiling tools to catch it.</p>
+          <object id="svg" data="" onload="onSVGLoad()" onerror="onSVGError()"></object>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
