@@ -11,23 +11,37 @@
     <script type="application/javascript"
             src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/jstree.min.js"></script>
     <script type="application/javascript">
-      $(function () {
-          $('#thread_tree').jstree();
-          $('#thread_tree').jstree("open_all");
-          $('#thread_tree').on("select_node.jstree", function (e, data) {
-              $('#svg').attr("data", data.node.text.split(" ")[0].replace("/", "_") + ".svg");
-          });
-      });
-
       $(document).on('change', '#results_combobox', function() {
           $('#results_combobox option:selected').each(function() {
-              alert($(this).val());
+              var value = $(this).val();
+              $.ajax({
+                  url: value + "/",
+                  method: 'POST',
+                  data: {tree: true}
+              }).done(function(result) {
+                  $('#thread_tree').attr('result_id', value);
+                  $('#thread_tree').html(result);
+                  $('#thread_tree').jstree();
+                  $('#thread_tree').jstree('open_all');
+                  $('#thread_tree').on('select_node.jstree', function (e, data) {
+                      $('#svg').attr('data', $('#thread_tree').attr('result_id') + '/' + data.node.text.split(' ')[0].replace('/', '_') + '.svg');
+                  });
+              }).fail(function(ajax_obj) {
+                  alert('Could not obtain the thread tree! (HTTP code ' + ajax_obj.status + ')');
+              });
           });
       });
 
       function onSVGLoad() {
-          var svg = document.getElementById("flamegraph");
+          $('#no_flamegraph').hide();
+          var svg = document.getElementById('flamegraph');
           svg.scrollTop = svg.scrollHeight;
+      }
+
+      function onSVGError() {
+          if ($('#svg').attr('data') != '') {
+              $('#no_flamegraph').show();
+          }
       }
     </script>
     <style type="text/css">
@@ -41,13 +55,18 @@
       object { max-width:100%; }
       #header { text-align:center; margin-bottom:20px; }
       #results_combobox { font-size:18px; min-width:50%; }
+      #no_flamegraph { display:none; }
     </style>
   </head>
   <body>
     <div id="main">
       <div id="header">
         <h1>Profiling results</h1>
-        <select name="results" id="results_combobox">
+        <noscript>
+          <h2>You must have JavaScript enabled in order to use this page!</h2>
+        </noscript>
+        <select name="results" id="results_combobox" autocomplete="off">
+          <option value="" selected="selected" disabled="disabled">Please select a test executed by the CI...</option>
           {% for x in ids %}
           <option value="{{ x.value }}">{{ x }}</option>
           {% endfor %}
@@ -58,7 +77,8 @@
           
         </div>
         <div id="flamegraph" class="scrollable">
-          
+          <p id="no_flamegraph">There is no flame graph associated with the selected thread! This may be caused by the running time of the thread being too short for the profiling tools to catch it.</p>
+          <object id="svg" data="" onload="onSVGLoad()" onerror="onSVGError()"></object>
         </div>
       </div>
     </div>
