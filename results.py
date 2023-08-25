@@ -25,6 +25,10 @@ class ProfilingThread:
         pass
 
 class ProfilingResults:
+    def is_identifier(identifier) -> bool:
+        return re.search(r'(\d+)_(\d+)_(\d+)_(\d+)_(\d+)_(.+)',
+                         identifier) is not None
+
     def get_all_ids() -> list:
         path = Path()
         id_str_list = []
