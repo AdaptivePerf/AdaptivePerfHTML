@@ -2,6 +2,9 @@ import re
 from treelib import Tree
 from pathlib import Path
 
+# Set the path to the profiling results storage here.
+PROFILING_STORAGE = '.'
+
 class Identifier:
     def __init__(self, id_str: str):
         self._id_str = id_str
@@ -30,9 +33,9 @@ class ProfilingResults:
                          identifier) is not None
 
     def get_all_ids() -> list:
-        path = Path()
+        path = Path(PROFILING_STORAGE)
         id_str_list = []
-        
+
         for x in filter(Path.is_dir, path.glob('*')):
             match = re.search(r'(\d+)_(\d+)_(\d+)_(\d+)_(\d+)_(.+)',
                               x.name)
@@ -53,6 +56,7 @@ class ProfilingResults:
 
     def __init__(self, identifier: str):
         self._syscalls_data = ''
+        path = Path(PROFILING_STORAGE) / identifier
 
         with (path / 'syscalls.data').open(mode='r') as f:
             for line in f:
