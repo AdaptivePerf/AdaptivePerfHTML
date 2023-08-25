@@ -54,7 +54,7 @@ class ProfilingResults:
     def __init__(self, identifier: str):
         self._syscalls_data = ''
 
-        with open('syscalls.data', mode='r') as f:
+        with (path / 'syscalls.data').open(mode='r') as f:
             for line in f:
                 self._syscalls_data += line
 
