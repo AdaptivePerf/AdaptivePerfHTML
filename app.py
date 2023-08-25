@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_from_directory
 from results import ProfilingResults
 
 app = Flask(__name__)
@@ -22,6 +22,13 @@ def get_tree(identifier):
         return to_return
 
     return '<ul>' + node_to_html(tree.get_node(tree.root)) + '</ul>'
+
+@app.get('/<identifier>/<path:path>')
+def get(identifier, path):
+    if ProfilingResults.is_identifier(identifier):
+        return send_from_directory(identifier, path)
+    else:
+        return '', 404
 
 @app.post('/<identifier>/')
 def post(identifier):
