@@ -72,7 +72,7 @@ class ProfilingResults:
 
         for line in self._syscalls_data.split('\n'):
             line = line.strip()
-            if line.startswith('?'):
+            if line.startswith('?') or len(line) == 0:
                 continue
 
             match = re.search(r'^\s*([0-9\.]+).+?\:\s*(.+?)/([0-9]+)\s*([a-z0-9]+|\.\.\.)(.+)', line)
