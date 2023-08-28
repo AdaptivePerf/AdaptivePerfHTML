@@ -3,7 +3,7 @@ from treelib import Tree
 from pathlib import Path
 
 # Set the path to the profiling results storage here.
-PROFILING_STORAGE = '.'
+PROFILING_STORAGE = '/eos/user/m/mgraczyk/syclops-profiling'
 
 class Identifier:
     def __init__(self, id_str: str):
