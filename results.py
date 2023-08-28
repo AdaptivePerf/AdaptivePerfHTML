@@ -73,35 +73,58 @@ class ProfilingResults:
 
         tmp_dict = {}
         pid_dict = {}
+        pid_name_dict = {}
+
+        def get_return_val(line, body):
+            return_match = re.search(r'\s*\=\s*([0-9]+)(?:\s*\(\S*\))?$', body)
+
+            if return_match is None:
+                raise RuntimeError((line, body))
+
+            return int(return_match.group(1))
 
         for line in self._syscalls_data.split('\n'):
             line = line.strip()
-            if line.startswith('?') or len(line) == 0:
+            if len(line) == 0:
                 continue
 
-            match = re.search(r'^\s*([0-9\.]+).+?\:\s*(.+?)/([0-9]+)\s*([a-z0-9]+|\.\.\.)(.+)', line)
+            match = re.search(r'^\s*([0-9\.\?]+).+?\:\s*(.+?)/([0-9]+)\s*([a-z0-9]+|\.\.\.)(.+)', line)
 
             if match is None:
                 raise RuntimeError(line)
 
-            t = int(match.group(1).replace('.', ''))
+            t = None if match.group(1) == '?' \
+                else int(match.group(1).replace('.', ''))
             name = match.group(2)
             pid = int(match.group(3))
             syscall = match.group(4)
             body = match.group(5)
 
-            if name not in ['perf', 'python3.12']:
+            ALLOWED = ['perf', 'python3.12']
+
+            if name not in ALLOWED and \
+               pid_name_dict.get(pid, '') not in ALLOWED:
                 continue
 
+            if name == str(pid):
+                name = pid_name_dict[pid]
+
             if syscall == '...':
+                if get_return_val(line, body) == 0:
+                    continue
+
                 if pid not in tmp_dict:
                     raise RuntimeError((line, pid))
 
                 syscall = tmp_dict[pid][0]
                 body = tmp_dict[pid][1] + re.sub(r'\s*\[continued\]\:\s*[a-z0-9]+\(.*?\)\)', '', body)
-                line += ' ***AND*** ' + tmp_dict[pid][2]
+
+                if t is None:
+                    t = tmp_dict[pid][2]
+
+                line += ' ***AND*** ' + tmp_dict[pid][3]
             elif body.endswith('...'):
-                tmp_dict[pid] = (syscall, body[:-3], line)
+                tmp_dict[pid] = (syscall, body[:-3], t, line)
                 continue
 
             if syscall != 'clone':
@@ -114,12 +137,7 @@ class ProfilingResults:
 
             flags = match_flags.group(1).replace(',', '').split('|')
 
-            return_match = re.search(r'\s*\=\s*([0-9]+)(?:\s*\(\S*\))?$', body)
-
-            if return_match is None:
-                raise RuntimeError((line, body))
-
-            return_val = int(return_match.group(1))
+            return_val = get_return_val(line, body)
 
             if name == 'perf' and '0x11' in flags:
                 start_time = t
@@ -139,6 +157,7 @@ class ProfilingResults:
                     raise NotImplementedError(line)
 
                 pid_dict[return_val] = code
+                pid_name_dict[return_val] = name
                 tree.create_node(f'{code} (at {t - start_time:,} &micro;s)', code, parent=calling)
 
         self._thread_tree = tree
