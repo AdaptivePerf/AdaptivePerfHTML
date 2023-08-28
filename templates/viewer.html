@@ -19,6 +19,10 @@
                   method: 'POST',
                   data: {tree: true}
               }).done(function(result) {
+                  if ($('#thread_tree').jstree(true)) {
+                      $('#thread_tree').jstree(true).destroy();
+                  }
+
                   $('#thread_tree').attr('result_id', value);
                   $('#thread_tree').html(result);
                   $('#thread_tree').jstree();
