@@ -73,7 +73,6 @@ class ProfilingResults:
 
         tmp_dict = {}
         pid_dict = {}
-        pid_name_dict = {}
 
         def get_return_val(line, body):
             return_match = re.search(r'\s*\=\s*([0-9]+)(?:\s*\(\S*\))?$', body)
@@ -103,11 +102,8 @@ class ProfilingResults:
             ALLOWED = ['perf', 'python3.12']
 
             if name not in ALLOWED and \
-               pid_name_dict.get(pid, '') not in ALLOWED:
+               name not in [f'{pid}', f':{pid}']:
                 continue
-
-            if name == str(pid):
-                name = pid_name_dict[pid]
 
             if syscall == '...':
                 if get_return_val(line, body) == 0:
@@ -145,7 +141,7 @@ class ProfilingResults:
                 pid_dict[return_val] = code
                 tree.create_node(f'{code} (at 0 &micro;s)', code)
                 tree.root = code
-            elif name == 'python3.12':
+            elif pid in pid_dict:
                 calling = pid_dict[pid]
 
                 if 'THREAD' in flags:
@@ -157,7 +153,6 @@ class ProfilingResults:
                     raise NotImplementedError(line)
 
                 pid_dict[return_val] = code
-                pid_name_dict[return_val] = name
                 tree.create_node(f'{code} (at {t - start_time:,} &micro;s)', code, parent=calling)
 
         self._thread_tree = tree
