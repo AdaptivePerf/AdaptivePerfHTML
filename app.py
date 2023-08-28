@@ -1,5 +1,6 @@
+import os
 from flask import Flask, render_template, request, send_from_directory
-from results import ProfilingResults
+from results import ProfilingResults, PROFILING_STORAGE
 
 app = Flask(__name__)
 
@@ -26,7 +27,8 @@ def get_tree(identifier):
 @app.get('/<identifier>/<path:path>')
 def get(identifier, path):
     if ProfilingResults.is_identifier(identifier):
-        return send_from_directory(identifier, path)
+        return send_from_directory(os.path.join(PROFILING_STORAGE, identifier),
+                                   path)
     else:
         return '', 404
 
