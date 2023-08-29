@@ -55,13 +55,9 @@ class ProfilingResults:
                         sorted(id_str_list, key=lambda x: x[1])))
 
     def __init__(self, identifier: str):
-        self._syscalls_data = ''
         path = Path(PROFILING_STORAGE) / identifier
 
-        with (path / 'syscalls.data').open(mode='r') as f:
-            for line in f:
-                self._syscalls_data += line
-
+        self._syscalls_data = (path / 'syscalls.data').read_text()
         self._thread_tree = None
 
     def get_thread_tree(self) -> Tree:
