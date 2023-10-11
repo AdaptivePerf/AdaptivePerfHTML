@@ -27,7 +27,7 @@
                   $('#thread_tree').html(result);
                   $('#thread_tree').jstree();
                   $('#thread_tree').on('select_node.jstree', function (e, data) {
-                      $('#svg').attr('data', $('#thread_tree').attr('result_id') + '/' + data.node.text.split(' ')[0].replace('/', '_') + '.svg');
+                      $('#svg').attr('data', $('#thread_tree').attr('result_id') + '/' + data.node.id + '.svg');
                   });
               }).fail(function(ajax_obj) {
                   if (ajax_obj.status == 500) {
@@ -78,6 +78,7 @@
           <option value="{{ x.value }}">{{ x }}</option>
           {% endfor %}
         </select>
+        <p style="font-style:italic">Glossary: [<b>start time in ms</b>+<b>runtime in ms (green: best, red: worst)</b>] <b>process name</b> (<b>PID</b>/<b>TID</b>). Flame graphs based on wall time use microseconds (us) as the time unit.</p>
       </div>
       <div id="block">
         <div id="thread_tree" class="scrollable">
