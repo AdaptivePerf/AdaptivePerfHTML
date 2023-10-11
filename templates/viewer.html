@@ -30,7 +30,11 @@
                       $('#svg').attr('data', $('#thread_tree').attr('result_id') + '/' + data.node.text.split(' ')[0].replace('/', '_') + '.svg');
                   });
               }).fail(function(ajax_obj) {
-                  alert('Could not obtain the thread tree! (HTTP code ' + ajax_obj.status + ')');
+                  if (ajax_obj.status == 500) {
+                      alert('Could not obtain the thread tree because of an error on the server side!');
+                  } else {
+                      alert('Could not obtain the thread tree! (HTTP code ' + ajax_obj.status + ')');
+                  }
               });
           });
       });
@@ -80,7 +84,7 @@
 
         </div>
         <div id="flamegraph" class="scrollable">
-          <p id="no_flamegraph">There is no flame graph associated with the selected thread! This may be caused by the running time of the thread being too short for the profiling tools to catch it.</p>
+          <p id="no_flamegraph">There is no flame graph associated with the selected process/thread! This may be caused by the running time of the process/thread being too short for the profiling tools to catch it.</p>
           <object id="svg" data="" onload="onSVGLoad()" onerror="onSVGError()"></object>
         </div>
       </div>
