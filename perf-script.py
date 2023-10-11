@@ -16,7 +16,7 @@ import pickle
 from pathlib import Path
 
 sys.path.append(os.environ['PERF_EXEC_PATH'] + \
-	'/scripts/python/Perf-Trace-Util/lib/Perf/Trace')
+                '/scripts/python/Perf-Trace-Util/lib/Perf/Trace')
 
 from perf_trace_context import *
 
@@ -102,48 +102,48 @@ def trace_end():
         sys.stdout.buffer.write(pickle.dumps(tree))
 
 def syscalls__sys_exit_clone3(event_name, context, common_cpu,
-	common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __syscall_nr, ret, perf_sample_dict):
-		common_callback(common_comm, perf_sample_dict['sample']['pid'],
-                       perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'],
-                       ret)
+                              common_secs, common_nsecs, common_pid, common_comm,
+                              common_callchain, __syscall_nr, ret, perf_sample_dict):
+        common_callback(common_comm, perf_sample_dict['sample']['pid'],
+                        perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'],
+                        ret)
 
 def syscalls__sys_exit_clone(event_name, context, common_cpu,
-	common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __syscall_nr, ret, perf_sample_dict):
-		common_callback(common_comm, perf_sample_dict['sample']['pid'],
-                       perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'],
-                       ret)
+                             common_secs, common_nsecs, common_pid, common_comm,
+                             common_callchain, __syscall_nr, ret, perf_sample_dict):
+        common_callback(common_comm, perf_sample_dict['sample']['pid'],
+                        perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'],
+                        ret)
 
 def syscalls__sys_exit_vfork(event_name, context, common_cpu,
-	common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __syscall_nr, ret, perf_sample_dict):
-		common_callback(common_comm, perf_sample_dict['sample']['pid'],
-                       perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'],
-                       ret)
+                             common_secs, common_nsecs, common_pid, common_comm,
+                             common_callchain, __syscall_nr, ret, perf_sample_dict):
+        common_callback(common_comm, perf_sample_dict['sample']['pid'],
+                        perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'],
+                        ret)
 
 def syscalls__sys_exit_fork(event_name, context, common_cpu,
-	common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __syscall_nr, ret, perf_sample_dict):
-		common_callback(common_comm, perf_sample_dict['sample']['pid'],
-                       perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'],
-                       ret)
+                            common_secs, common_nsecs, common_pid, common_comm,
+                            common_callchain, __syscall_nr, ret, perf_sample_dict):
+        common_callback(common_comm, perf_sample_dict['sample']['pid'],
+                        perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'],
+                        ret)
 
 def syscalls__sys_exit_execve(event_name, context, common_cpu,
-	common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __syscall_nr, ret, perf_sample_dict):
-		execve_callback(common_comm, perf_sample_dict['sample']['pid'],
-                                perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'],
-                                ret)
+                              common_secs, common_nsecs, common_pid, common_comm,
+                              common_callchain, __syscall_nr, ret, perf_sample_dict):
+        execve_callback(common_comm, perf_sample_dict['sample']['pid'],
+                        perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'],
+                        ret)
 
 def syscalls__sys_enter_exit(event_name, context, common_cpu,
-	common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __syscall_nr, error_code, perf_sample_dict):
-		exit_callback(common_comm, perf_sample_dict['sample']['pid'],
-                              perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'], False)
+                             common_secs, common_nsecs, common_pid, common_comm,
+                             common_callchain, __syscall_nr, error_code, perf_sample_dict):
+        exit_callback(common_comm, perf_sample_dict['sample']['pid'],
+                      perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'], False)
 
 def syscalls__sys_enter_exit_group(event_name, context, common_cpu,
-	common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __syscall_nr, error_code, perf_sample_dict):
-		exit_callback(common_comm, perf_sample_dict['sample']['pid'],
-                              perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'], True)
+                                   common_secs, common_nsecs, common_pid, common_comm,
+                                   common_callchain, __syscall_nr, error_code, perf_sample_dict):
+        exit_callback(common_comm, perf_sample_dict['sample']['pid'],
+                      perf_sample_dict['sample']['tid'], perf_sample_dict['sample']['time'], True)
