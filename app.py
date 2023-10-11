@@ -7,9 +7,22 @@ app = Flask(__name__)
 def get_tree(identifier):
     result = ProfilingResults(identifier)
     tree = result.get_thread_tree()
-    
+
     def node_to_html(node):
-        to_return = '<li>' + node.tag
+        # process name, PID/TID, start time in ns, runtime in ns, runtime color code
+        a, b, c, d, e = node.tag
+
+        # Convert times to milliseconds
+        c /= 1000000
+        if d != -1:
+            d /= 1000000
+
+        # Convert runtime color code to red and green codes in RGB (blue is always 0)
+        red, green = min(e, 255), min(510 - e, 255)
+
+        to_return = f'<li id="{b.replace("/", "_")}">' + \
+            f'[{c:.3f}+<span style="background-color:#{red:0{2}x}{green:0{2}x}00">{d:.3f}</span>] {a} ({b})' if d != -1 \
+                else f'[{c:.3f}+?] {a} ({b})'
 
         children = tree.children(node.identifier)
 

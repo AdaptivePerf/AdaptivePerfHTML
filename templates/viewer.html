@@ -26,12 +26,15 @@
                   $('#thread_tree').attr('result_id', value);
                   $('#thread_tree').html(result);
                   $('#thread_tree').jstree();
-                  $('#thread_tree').jstree('open_all');
                   $('#thread_tree').on('select_node.jstree', function (e, data) {
-                      $('#svg').attr('data', $('#thread_tree').attr('result_id') + '/' + data.node.text.split(' ')[0].replace('/', '_') + '.svg');
+                      $('#svg').attr('data', $('#thread_tree').attr('result_id') + '/' + data.node.id + '.svg');
                   });
               }).fail(function(ajax_obj) {
-                  alert('Could not obtain the thread tree! (HTTP code ' + ajax_obj.status + ')');
+                  if (ajax_obj.status == 500) {
+                      alert('Could not obtain the thread tree because of an error on the server side!');
+                  } else {
+                      alert('Could not obtain the thread tree! (HTTP code ' + ajax_obj.status + ')');
+                  }
               });
           });
       });
@@ -75,13 +78,14 @@
           <option value="{{ x.value }}">{{ x }}</option>
           {% endfor %}
         </select>
+        <p style="font-style:italic">Glossary: [<b>start time in ms</b>+<b>runtime in ms (green: best, red: worst)</b>] <b>process name</b> (<b>PID</b>/<b>TID</b>). Flame graphs based on wall time use microseconds (us) as the time unit.</p>
       </div>
       <div id="block">
         <div id="thread_tree" class="scrollable">
 
         </div>
         <div id="flamegraph" class="scrollable">
-          <p id="no_flamegraph">There is no flame graph associated with the selected thread! This may be caused by the running time of the thread being too short for the profiling tools to catch it.</p>
+          <p id="no_flamegraph">There is no flame graph associated with the selected process/thread! This may be caused by the running time of the process/thread being too short for the profiling tools to catch it.</p>
           <object id="svg" data="" onload="onSVGLoad()" onerror="onSVGError()"></object>
         </div>
       </div>
