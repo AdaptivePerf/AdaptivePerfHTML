@@ -9,11 +9,15 @@ def get_tree(identifier):
     tree = result.get_thread_tree()
 
     def node_to_html(node):
+        # process name, PID/TID, start time in ns, runtime in ns, runtime color code
         a, b, c, d, e = node.tag
+
+        # Convert times to milliseconds
         c /= 1000000
         if d != -1:
             d /= 1000000
 
+        # Convert runtime color code to red and green codes in RGB (blue is always 0)
         red, green = min(e, 255), min(510 - e, 255)
 
         to_return = f'<li id="{b.replace("/", "_")}">' + \
