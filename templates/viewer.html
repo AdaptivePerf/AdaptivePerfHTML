@@ -26,7 +26,6 @@
                   $('#thread_tree').attr('result_id', value);
                   $('#thread_tree').html(result);
                   $('#thread_tree').jstree();
-                  $('#thread_tree').jstree('open_all');
                   $('#thread_tree').on('select_node.jstree', function (e, data) {
                       $('#svg').attr('data', $('#thread_tree').attr('result_id') + '/' + data.node.text.split(' ')[0].replace('/', '_') + '.svg');
                   });
