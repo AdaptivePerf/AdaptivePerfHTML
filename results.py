@@ -64,7 +64,7 @@ class ProfilingResults:
         if self._thread_tree is not None:
             return self._thread_tree
 
-        r = subprocess.run(['/data/mgraczyk/linux/tools/perf/perf', 'script', '-i',
+        r = subprocess.run(['perf', 'script', '-i',
                             'syscalls.data', '-s',
                             Path(__file__).resolve().parent / 'perf-script.py'],
                            cwd=self._path, stdout=subprocess.PIPE)
