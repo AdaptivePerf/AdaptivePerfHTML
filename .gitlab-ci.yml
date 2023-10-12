@@ -7,8 +7,8 @@ syclops-pviewer-deploy:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
   stage: deploy
-  #rules:
-  #  - if: $CI_COMMIT_BRANCH == "master"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
   variables:
     IMAGE_DESTINATION: gitlab-registry.cern.ch/syclops/profilingviewer:latest
   script:
