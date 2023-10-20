@@ -1,46 +1,148 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>SYCLOPS profiling</title>
+    <title>AdaptivePerf results</title>
     <link type="text/css" rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css" />
     <script type="application/javascript"
             src="https://code.jquery.com/jquery-3.7.0.min.js"
 	    integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g="
             crossorigin="anonymous"></script>
+    {% if local %}
     <script type="application/javascript"
-            src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/jstree.min.js"></script>
+            src="vis-timeline-graph2d.min.js"></script>
+    <link type="text/css" rel="stylesheet"
+          href="vis-timeline-graph2d.min.css" />
+    {% else %}
+    <script type="application/javascript"
+            src="{{ url_for('static', filename='vis-timeline-graph2d.min.js') }}"></script>
+    <link type="text/css" rel="stylesheet"
+          href="{{ url_for('static', filename='vis-timeline-graph2d.min.css') }}" />
+    {% endif %}
     <script type="application/javascript">
       $(document).on('change', '#results_combobox', function() {
           $('#results_combobox option:selected').each(function() {
+              var local = {% if local %}true{% else %}false{% endif %};
               var value = $(this).val();
-              $.ajax({
-                  url: value + "/",
+              var ajaxPostOptions = {
+                  url: value + '/',
                   method: 'POST',
                   data: {tree: true}
-              }).done(function(result) {
-                  if ($('#thread_tree').jstree(true)) {
-                      $('#thread_tree').jstree(true).destroy();
+              };
+
+              function parseResult(result) {
+                  function from_json_to_item(json, level,
+                                             item_list, group_list,
+                                             item_dict) {
+                      var item = {
+                          id: json.id,
+                          group: json.id,
+                          content: json.name + ' (' + json.pid_tid + '): ' + json.runtime + ' ms',
+                          start: json.start_time,
+                          end: json.start_time + json.runtime,
+                          style: 'font-size:12px'
+                      };
+
+                      var group = {
+                          id: json.id,
+                          content: json.name + ' (' + json.pid_tid + ')',
+                          style: 'padding-left: ' + (level * 25) + 'px',
+                          showNested: false
+                      };
+
+                      var nestedGroups = []
+
+                      for (var i = 0; i < json.children.length; i++) {
+                          nestedGroups.push(json.children[i].id);
+                      }
+
+                      if (nestedGroups.length > 0) {
+                          group.nestedGroups = nestedGroups;
+                      }
+
+                      item_list.push(item);
+                      group_list.push(group);
+
+                      item_dict[item.id] = item.content;
+
+                      for (var i = 0; i < json.children.length; i++) {
+                          from_json_to_item(json.children[i],
+                                            level + 1,
+                                            item_list,
+                                            group_list,
+                                            item_dict);
+                      }
                   }
 
-                  $('#thread_tree').attr('result_id', value);
-                  $('#thread_tree').html(result);
-                  $('#thread_tree').jstree();
-                  $('#thread_tree').on('select_node.jstree', function (e, data) {
-                      $('#svg').attr('data', $('#thread_tree').attr('result_id') + '/' + data.node.id + '.svg');
+                  $('#block').attr('result_id', value);
+
+                  var item_list = [];
+                  var group_list = [];
+                  var item_dict = {};
+
+                  from_json_to_item(JSON.parse(result), 0,
+                                    item_list, group_list, item_dict);
+
+                  var container = document.getElementById('block');
+                  container.innerHTML = '';
+
+                  var timeline = new vis.Timeline(
+                      container,
+                      item_list,
+                      group_list,
+                      {
+                          format: {
+                              minorLabels: {
+                                  millisecond:'x',
+                                  second:     'x',
+                                  minute:     'x',
+                                  hour:       'x',
+                                  weekday:    'x',
+                                  day:        'x',
+                                  week:       'x',
+                                  month:      'x',
+                                  year:       'x'
+                              }
+                          },
+                          showMajorLabels: false
+                      }
+                  );
+
+                  timeline.on('doubleClick', function (props) {
+                      if (props.item != null) {
+                          $('#flamegraph_title').text(item_dict[props.item]);
+                          $('#svg').attr('data', $('#block').attr('result_id') + '/' + (local ? 'processed/' : '') + props.item + '.svg');
+                      }
                   });
-              }).fail(function(ajax_obj) {
-                  if (ajax_obj.status == 500) {
-                      alert('Could not obtain the thread tree because of an error on the server side!');
-                  } else {
-                      alert('Could not obtain the thread tree! (HTTP code ' + ajax_obj.status + ')');
-                  }
-              });
+              }
+
+              if (local) {
+                  parseResult($(this).attr('data-tree'));
+              } else {
+                  $.ajax(ajaxPostOptions)
+                      .done(parseResult)
+                      .fail(function(ajax_obj) {
+                          if (ajax_obj.status == 500) {
+                              alert('Could not obtain the tree because of an error on the server side!');
+                          } else {
+                              alert('Could not obtain the tree! (HTTP code ' + ajax_obj.status + ')');
+                          }
+                      });
+              }
           });
       });
 
+      function onFlamegraphBackgroundClick() {
+          $('#flamegraph_background').hide();
+      }
+
+      function onFlamegraphBlockClick(event) {
+          event.stopPropagation();
+      }
+
       function onSVGLoad() {
           $('#no_flamegraph').hide();
+          $('#flamegraph_background').show();
           var svg = document.getElementById('flamegraph');
           svg.scrollTop = svg.scrollHeight;
       }
@@ -48,41 +150,133 @@
       function onSVGError() {
           if ($('#svg').attr('data') != '') {
               $('#no_flamegraph').show();
+              $('#flamegraph_background').show();
           }
       }
     </script>
     <style type="text/css">
-      html, body { height:100%; }
-      body { font-family:Arial; background-color:grey; display:flex; align-items:center; justify-content:center; height:100%; overflow:hidden; }
-      #block { height:75vh; display:flex; }
-      #main { height:90vh; width:90vw; max-height:90vh; max-width:90vw; padding:10px; border-radius:10px; background-color:white; }
-      #thread_tree { margin-right:10px; flex:1; }
-      #flamegraph { flex:2; text-align:center; }
-      .scrollable { overflow-y:scroll; }
-      object { max-width:100%; }
-      #header { text-align:center; margin-bottom:20px; }
-      #results_combobox { font-size:18px; min-width:50%; }
-      #no_flamegraph { display:none; }
+      html, body {
+          height:100%;
+      }
+
+      body {
+          font-family:Arial;
+          background-color:grey;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          height:100%;
+          overflow:hidden;
+      }
+
+      #block {
+          flex-grow:1;
+      }
+
+      #main {
+          height:90vh;
+          width:90vw;
+          max-height:90vh;
+          max-width:90vw;
+          padding:10px;
+          border-radius:10px;
+          background-color:white;
+          display:flex;
+          flex-direction:column;
+      }
+
+      .scrollable {
+          overflow-y:scroll;
+      }
+
+      object {
+          max-width:100%;
+      }
+
+      #header {
+          text-align:center;
+          margin-bottom:20px;
+      }
+
+      #results_combobox {
+          font-size:18px;
+          min-width:50%;
+      }
+
+      #flamegraph_background {
+          display:none;
+          position:fixed;
+          top: 0;
+          left: 0;
+          width:100%;
+          height:100%;
+          background-color: rgba(0, 0, 0, 0.5);
+      }
+
+      #flamegraph_block {
+          position:fixed;
+          max-height:90vh;
+          border-radius:10px;
+          padding:10px;
+          background-color:white;
+          top:50%;
+          left:50%;
+          transform:translate(-50%, -50%);
+          display:flex;
+          flex-direction:column;
+      }
+
+      #flamegraph_title {
+          width:100%;
+          text-align:center;
+          margin:10px;
+      }
+
+      #flamegraph {
+          flex-grow:1;
+      }
+
+      #no_flamegraph {
+          display:none;
+      }
+
+      .vis-group-level-unknown-but-gte1 {
+          border:0;
+      }
+
+      .vis-label.vis-nested-group.vis-group-level-unknown-but-gte1 {
+          background-color:white;
+      }
+
+      .vis-ltr .vis-label.vis-nested-group .vis-inner {
+          padding-left:0;
+      }
     </style>
   </head>
   <body>
     <div id="main">
       <div id="header">
-        <h1>Profiling results</h1>
+        <h1>AdaptivePerf results</h1>
         <noscript>
           <h2>You must have JavaScript enabled in order to use this page!</h2>
         </noscript>
         <select name="results" id="results_combobox" autocomplete="off">
           <option value="" selected="selected" disabled="disabled">Please select a test executed by the CI...</option>
           {% for x in ids %}
-          <option value="{{ x.value }}">{{ x }}</option>
+          <option value="{{ x.value }}"{% if local %} data-tree="{{ get_tree(x.value) }}"{% endif %}>{{ x }}</option>
           {% endfor %}
         </select>
-        <p style="font-style:italic">Glossary: [<b>start time in ms</b>+<b>runtime in ms (green: best, red: worst)</b>] <b>process name</b> (<b>PID</b>/<b>TID</b>). Flame graphs based on wall time use microseconds (us) as the time unit.</p>
+        <p style="font-style:italic">Glossary: <b>process name</b> (<b>PID</b>/<b>TID</b>): <b>runtime length</b>. The time axis is in milliseconds (ms). Flame graphs based on wall time use microseconds (us) as the time unit.</p>
       </div>
-      <div id="block">
-        <div id="thread_tree" class="scrollable">
+      <div id="block" class="scrollable">
 
+      </div>
+    </div>
+    <div id="flamegraph_background" onclick="onFlamegraphBackgroundClick()">
+      <div id="flamegraph_block" onclick="onFlamegraphBlockClick(event)">
+        <div id="flamegraph_header">
+          <h2 id="flamegraph_title">Test</h2>
+          <p style="font-style:italic; text-align:center">Click anywhere outside of the window to close it.</p>
         </div>
         <div id="flamegraph" class="scrollable">
           <p id="no_flamegraph">There is no flame graph associated with the selected process/thread! This may be caused by the running time of the process/thread being too short for the profiling tools to catch it.</p>
