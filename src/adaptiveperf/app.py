@@ -18,7 +18,7 @@ def get(identifier, path):
 @app.post('/<identifier>/')
 def post(identifier):
     if 'tree' in request.values:
-        return ProfilingResults(identifier).get_json_tree()
+        return ProfilingResults(PROFILING_STORAGE, identifier).get_json_tree()
     else:
         return '', 400
 

@@ -14,7 +14,8 @@ def create_html(results_path):
     ids = ProfilingResults.get_all_ids(results_path)
 
     index_html = template.render(ids=ids, local=True,
-                                 get_tree=lambda x: html.escape(ProfilingResults(x).get_json_tree(), quote=True))
+                                 get_tree=lambda x: html.escape(ProfilingResults(results_path,
+                                                                                 x).get_json_tree(), quote=True))
 
     with (results_path / 'index.html').open(mode='w') as f:
         f.write(index_html)

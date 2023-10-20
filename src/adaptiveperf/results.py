@@ -51,8 +51,8 @@ class ProfilingResults:
         return list(map(lambda x: Identifier(x[0]),
                         sorted(id_str_list, key=lambda x: x[1])))
 
-    def __init__(self, identifier: str):
-        self._path = Path(PROFILING_STORAGE) / identifier
+    def __init__(self, profiling_storage: str, identifier: str):
+        self._path = Path(profiling_storage) / identifier
         self._thread_tree = None
 
     def get_thread_tree(self) -> Tree:
