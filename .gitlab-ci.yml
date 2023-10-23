@@ -7,11 +7,13 @@ syclops-pviewer-deploy:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
   stage: deploy
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-  variables:
-    IMAGE_DESTINATION: gitlab-registry.cern.ch/syclops/profilingviewer:latest
   script:
+    - |
+      if [[ $CI_COMMIT_BRANCH == "main" ]]; then
+        export IMAGE_DESTINATION=gitlab-registry.cern.ch/syclops/adaptiveperfhtml:latest
+      else
+        export IMAGE_DESTINATION=gitlab-registry.cern.ch/syclops/adaptiveperfhtml:$CI_COMMIT_BRANCH
+      fi
     # Prepare Kaniko configuration file
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_DEPLOY_USER\",\"password\":\"$CI_DEPLOY_PASSWORD\"}}}" > /kaniko/.docker/config.json
     # Build and push the image from the Dockerfile at the root of the project.
