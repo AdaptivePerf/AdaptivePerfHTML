@@ -34,13 +34,14 @@ def main():
               'message.', file=sys.stderr)
         sys.exit(1)
 
-    path = Path(sys.argv[1])
+    path_str = sys.argv[1]
+    path = Path(path_str)
 
     if not path.exists():
         print(f'{path} does not exist!', file=sys.stderr)
         sys.exit(1)
 
-    create_html(path)
+    create_html(path_str)
 
     print(f'Done! You can open {path.resolve() / "results" / "index.html"} '
           'in your web browser.', file=sys.stderr)

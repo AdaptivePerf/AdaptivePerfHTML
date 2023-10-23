@@ -30,8 +30,9 @@ class ProfilingResults:
         return re.search(r'(\d+)_(\d+)_(\d+)_(\d+)_(\d+)_(.+)',
                          identifier) is not None
 
-    def get_all_ids(path) -> list:
+    def get_all_ids(path_str: str) -> list:
         id_str_list = []
+        path = Path(path_str)
 
         for x in filter(Path.is_dir, path.glob('*')):
             match = re.search(r'(\d+)_(\d+)_(\d+)_(\d+)_(\d+)_(.+)',
