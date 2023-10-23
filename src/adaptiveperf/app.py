@@ -1,6 +1,6 @@
 import os
 from flask import Flask, render_template, request, send_from_directory
-from results import ProfilingResults
+from . import ProfilingResults
 
 # Set the path to the profiling results storage here.
 PROFILING_STORAGE = '/eos/user/m/mgraczyk/syclops-profiling'
