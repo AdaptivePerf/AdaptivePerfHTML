@@ -10,7 +10,9 @@ app = Flask(__name__)
 @app.get('/<identifier>/<path:path>')
 def get(identifier, path):
     if ProfilingResults.is_identifier(identifier):
-        return send_from_directory(os.path.join(PROFILING_STORAGE, identifier),
+        return send_from_directory(os.path.join(PROFILING_STORAGE,
+                                                'processed',
+                                                identifier),
                                    path)
     else:
         return '', 404
