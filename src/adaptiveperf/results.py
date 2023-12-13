@@ -56,6 +56,9 @@ class ProfilingResults:
         self._path = Path(profiling_storage) / identifier
         self._thread_tree = None
 
+        with (self._path / 'new_proc_callchains.data').open(mode='r') as f:
+            self._start_callchains = json.load(f)
+
     def get_thread_tree(self) -> Tree:
         if self._thread_tree is not None:
             return self._thread_tree
@@ -85,24 +88,53 @@ class ProfilingResults:
         tree = self.get_thread_tree()
 
         def node_to_dict(node):
-            # process name, PID/TID, start time in ns, runtime in ns, runtime color code
-            a, b, c, d, e = node.tag
+            # process name, PID/TID, ordered off-CPU time regions,
+            # start time in ns, runtime in ns, runtime color code
+            a, b, g, c, d, e = node.tag
 
             # Convert times to milliseconds
             c /= 1000000
             if d != -1:
                 d /= 1000000
 
-            # Convert runtime color code to red and green codes in RGB (blue is always 0)
+            g = list(map(lambda x: (x[0] / 1000000, x[1] / 1000000), g))
+
+            sampled_time_path = self._path / 'processed' / \
+                f'{b.replace("/", "_")}_sampled_time.data'
+            data_path = self._path / 'processed' / \
+                         f'{b.replace("/", "_")}.data'
+
+            if sampled_time_path.exists() and \
+               len(sampled_time_path.read_text()) > 0:
+                total_sampled_time = float(sampled_time_path.read_text())
+            elif data_path.exists():
+                total_sampled_time = 0
+
+                with data_path.open(mode='r') as f:
+                    for line in f:
+                        total_sampled_time += float(line.strip().split(' ')[-1])
+
+                total_sampled_time /= 1000
+
+                with sampled_time_path.open(mode='w') as f:
+                    f.write(str(total_sampled_time))
+            else:
+                total_sampled_time = d
+
+            # Convert runtime color code to red and green codes in RGB
+            # (blue is always 0)
             red, green = min(e, 255), min(510 - e, 255)
 
             to_return = {
                 'id': b.replace('/', '_'),
                 'start_time': c,
                 'runtime': d,
+                'sampled_time': total_sampled_time,
                 'name': a,
                 'pid_tid': b,
                 'color': f'#{red:0{2}x}{green:0{2}x}00',
+                'off_cpu': g,
+                'start_callchain': self._start_callchains[b.split('/')[1]],
                 'children': []
             }
 

@@ -22,7 +22,6 @@
     <script type="application/javascript">
       $(document).on('change', '#results_combobox', function() {
           $('#results_combobox option:selected').each(function() {
-              var local = {% if local %}true{% else %}false{% endif %};
               var value = $(this).val();
               var ajaxPostOptions = {
                   url: value + '/',
@@ -33,14 +32,17 @@
               function parseResult(result) {
                   function from_json_to_item(json, level,
                                              item_list, group_list,
-                                             item_dict) {
+                                             item_dict, callchain_dict) {
+                      var color_scale = Math.max(0, 255 - (json.runtime - json.sampled_time) / json.sampled_time * 255);
+
                       var item = {
                           id: json.id,
                           group: json.id,
-                          content: json.name + ' (' + json.pid_tid + '): ' + json.runtime + ' ms',
+                          type: 'background',
+                          content: json.name + ' (' + json.pid_tid + '): ' + '<b>~' + json.sampled_time.toFixed(3) + ' ms</b> + ~' + (json.runtime - json.sampled_time).toFixed(3) + ' ms',
                           start: json.start_time,
                           end: json.start_time + json.runtime,
-                          style: 'font-size:12px'
+                          style: 'font-size:12px; background-color:rgba(255, ' + color_scale + ', 0, 0.5); z-index:-1'
                       };
 
                       var group = {
@@ -63,14 +65,33 @@
                       item_list.push(item);
                       group_list.push(group);
 
-                      item_dict[item.id] = item.content;
+                      item_dict[item.id] = json.name + ' (' + json.pid_tid + '):<br />' + '~' + json.sampled_time.toFixed(3) + ' ms + ~' + (json.runtime - json.sampled_time).toFixed(3) + ' ms (extra time due to preemption and sampling accuracy)';
+
+                      if (level > 0) {
+                          callchain_dict[item.id] = json.start_callchain;
+                      }
+
+                      for (var i = 0; i < json.off_cpu.length; i++) {
+                          var off_cpu_item = {
+                              id: json.id + '_offcpu' + i,
+                              group: json.id,
+                              type: 'background',
+                              content: '',
+                              start: json.off_cpu[i][0],
+                              end: json.off_cpu[i][0] + json.off_cpu[i][1],
+                              style: 'background-color:rgba(0, 0, 0, 0.5)'
+                          };
+
+                          item_list.push(off_cpu_item);
+                      }
 
                       for (var i = 0; i < json.children.length; i++) {
                           from_json_to_item(json.children[i],
                                             level + 1,
                                             item_list,
                                             group_list,
-                                            item_dict);
+                                            item_dict,
+                                            callchain_dict);
                       }
                   }
 
@@ -79,9 +100,11 @@
                   var item_list = [];
                   var group_list = [];
                   var item_dict = {};
+                  var callchain_dict = {};
 
                   from_json_to_item(JSON.parse(result), 0,
-                                    item_list, group_list, item_dict);
+                                    item_list, group_list, item_dict,
+                                    callchain_dict);
 
                   var container = document.getElementById('block');
                   container.innerHTML = '';
@@ -109,39 +132,67 @@
                   );
 
                   timeline.on('doubleClick', function (props) {
-                      if (props.item != null) {
-                          $('#flamegraph_title').text(item_dict[props.item]);
-                          $('#svg').attr('data', $('#block').attr('result_id') + '/' + (local ? 'processed/' : '') + props.item + '.svg');
+                      if (props.group != null) {
+                          $('#flamegraph_title').html(item_dict[props.group]);
+                          $('#metric').val('walltime');
+                          $('#time_ordered').prop("checked", false);
+                          $('#svg').attr('data', $('#block').attr('result_id') + {% if local %}'/processed/'{% else %}'/'{% endif %} + props.group + '_walltime.svg');
+                          $('#flamegraph').attr('data-id', props.group);
+                      }
+                  });
+
+                  timeline.on('contextmenu', function (props) {
+                      if (props.group != null && props.group in callchain_dict) {
+                          $('#callchain').html(callchain_dict[props.group].join("<br />"));
+                          $('#callchain_block').css('top', props.pageY);
+                          $('#callchain_block').css('left', props.pageX);
+                          $('#callchain_block').outerHeight('auto');
+                          $('#callchain_block').css('display', 'flex');
+
+                          var height = $('#callchain_block').outerHeight();
+                          var width = $('#callchain_block').outerWidth();
+
+                          if (props.pageY + height > $(window).outerHeight() - 30) {
+                              $('#callchain_block').outerHeight($(window).outerHeight() - props.pageY - 30);
+                          }
+
+                          if (props.pageX + width > $(window).outerWidth() - 20) {
+                              $('#callchain_block').css('left', props.pageX - width);
+                          }
+
+                          props.event.preventDefault();
                       }
                   });
               }
 
-              if (local) {
-                  parseResult($(this).attr('data-tree'));
-              } else {
-                  $.ajax(ajaxPostOptions)
-                      .done(parseResult)
-                      .fail(function(ajax_obj) {
-                          if (ajax_obj.status == 500) {
-                              alert('Could not obtain the tree because of an error on the server side!');
-                          } else {
-                              alert('Could not obtain the tree! (HTTP code ' + ajax_obj.status + ')');
-                          }
-                      });
-              }
+              {% if local %}
+              parseResult($(this).attr('data-tree'));
+              {% else %}
+              $.ajax(ajaxPostOptions)
+                  .done(parseResult)
+                  .fail(function(ajax_obj) {
+                      if (ajax_obj.status == 500) {
+                          alert('Could not obtain the tree because of an error on the server side!');
+                      } else {
+                          alert('Could not obtain the tree! (HTTP code ' + ajax_obj.status + ')');
+                      }
+                  });
+              {% endif %}
           });
       });
 
-      function onFlamegraphBackgroundClick() {
+      function onBackgroundClick() {
           $('#flamegraph_background').hide();
+          $('#callchain_block').hide();
       }
 
-      function onFlamegraphBlockClick(event) {
+      function onBlockClick(event) {
           event.stopPropagation();
       }
 
       function onSVGLoad() {
           $('#no_flamegraph').hide();
+          $('#flamegraph_choice').show();
           $('#flamegraph_background').show();
           var svg = document.getElementById('flamegraph');
           svg.scrollTop = svg.scrollHeight;
@@ -150,7 +201,20 @@
       function onSVGError() {
           if ($('#svg').attr('data') != '') {
               $('#no_flamegraph').show();
+              $('#flamegraph_choice').hide();
               $('#flamegraph_background').show();
+          }
+      }
+
+      function onMetricChange(event) {
+
+      }
+
+      function onTimeOrderedChange(event) {
+          if (event.currentTarget.checked) {
+              $('#svg').attr('data', $('#block').attr('result_id') + {% if local %}'/processed/'{% else %}'/'{% endif %} + $('#flamegraph').attr('data-id') + '_walltime_chart.svg');
+          } else {
+              $('#svg').attr('data', $('#block').attr('result_id') + {% if local %}'/processed/'{% else %}'/'{% endif %} + $('#flamegraph').attr('data-id') + '_walltime.svg');
           }
       }
     </script>
@@ -213,6 +277,23 @@
           background-color: rgba(0, 0, 0, 0.5);
       }
 
+      #callchain {
+          font-size:14px;
+          overflow:scroll;
+          flex-grow:1;
+          white-space:nowrap;
+      }
+
+      #callchain_block {
+          position:fixed;
+          border-radius:10px;
+          padding:10px;
+          background-color:white;
+          display:none;
+          flex-direction:column;
+          max-width:50vw;
+      }
+
       #flamegraph_block {
           position:fixed;
           max-height:90vh;
@@ -226,10 +307,23 @@
           flex-direction:column;
       }
 
-      #flamegraph_title {
+      #callchain_block {
+          box-shadow:10px 10px 5px;
+      }
+
+      #callchain {
+          /* Based on https://meta.stackexchange.com/a/36177 */
+          font-family:Consolas,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New;
+      }
+
+      #flamegraph_title, #flamegraph_choice {
           width:100%;
           text-align:center;
           margin:10px;
+      }
+
+      #metric {
+          min-width:250px;
       }
 
       #flamegraph {
@@ -251,9 +345,14 @@
       .vis-ltr .vis-label.vis-nested-group .vis-inner {
           padding-left:0;
       }
+
+      .narrow_margin {
+          margin-top:0;
+          margin-bottom:10px;
+      }
     </style>
   </head>
-  <body>
+  <body onclick="onBackgroundClick()">
     <div id="main">
       <div id="header">
         <h1>AdaptivePerf results</h1>
@@ -266,20 +365,32 @@
           <option value="{{ x.value }}"{% if local %} data-tree="{{ get_tree(x.value) }}"{% endif %}>{{ x }}</option>
           {% endfor %}
         </select>
-        <p style="font-style:italic">Glossary: <b>process name</b> (<b>PID</b>/<b>TID</b>): <b>runtime length</b>. The time axis is in milliseconds (ms). Flame graphs based on wall time use microseconds (us) as the time unit.</p>
+        <p style="font-style:italic">Glossary: <b>process name</b> (<b>PID</b>/<b>TID</b>): <b>sampled runtime length</b> + <b>extra runtime length due to preemption and sampling accuracy</b>. The time axis is in milliseconds (ms). The colour scale indicates the amount of extra runtime (yellow = low, red = high). Dark parts correspond to off-CPU activity.</p>
       </div>
       <div id="block" class="scrollable">
 
       </div>
     </div>
-    <div id="flamegraph_background" onclick="onFlamegraphBackgroundClick()">
-      <div id="flamegraph_block" onclick="onFlamegraphBlockClick(event)">
+    <div id="callchain_block" onclick="onBlockClick(event)">
+      <h3 class="narrow_margin">Spawned by:</h3>
+      <span id="callchain"></span>
+    </div>
+    <div id="flamegraph_background" onclick="onBackgroundClick()">
+      <div id="flamegraph_block" onclick="onBlockClick(event)">
         <div id="flamegraph_header">
           <h2 id="flamegraph_title">Test</h2>
           <p style="font-style:italic; text-align:center">Click anywhere outside of the window to close it.</p>
         </div>
+        <div id="flamegraph_choice">
+          Metric: 
+          <select name="metric" id="metric" onchange="onMetricChange(event)">
+            <option value="walltime">Wall time (us)</option>
+          </select>
+          <input type="checkbox" id="time_ordered" name="time_ordered" onchange="onTimeOrderedChange(event)">
+          <label for="time_ordered">Time-ordered</label>
+        </div>
         <div id="flamegraph" class="scrollable">
-          <p id="no_flamegraph">There is no flame graph associated with the selected process/thread! This may be caused by the running time of the process/thread being too short for the profiling tools to catch it.</p>
+          <p id="no_flamegraph">There is no flame graph associated with the selected process/thread (or the flame graph could not be loaded)! This may be caused by the running time of the process/thread being too short for the profiling tools to catch it.</p>
           <object id="svg" data="" onload="onSVGLoad()" onerror="onSVGError()"></object>
         </div>
       </div>
