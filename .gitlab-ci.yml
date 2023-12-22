@@ -27,6 +27,19 @@ docker-test:
   image:
     name: gitlab-registry.cern.ch/syclops/adaptiveperfhtml:$CI_COMMIT_BRANCH
     entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR
+    - pytest
+
+docker-test-main:
+  image:
+    name: gitlab-registry.cern.ch/syclops/adaptiveperfhtml:latest
+    entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
   stage: test
   script:
     - cd $CI_PROJECT_DIR
