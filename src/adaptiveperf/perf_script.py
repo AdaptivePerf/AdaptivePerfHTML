@@ -79,8 +79,7 @@ def execve_callback(comm_name, pid, tid, time, ret_value):
     elif not profile_start:
         return
 
-    if tid not in time_dict:
-        time_dict[tid] = time
+    time_dict[tid] = time
     name_dict[tid] = comm_name
 
 
@@ -94,6 +93,10 @@ def exit_callback(comm_name, pid, tid, time, exit_group):
 
 
 def trace_end():
+    if len(time_dict) == 0:
+        sys.stdout.buffer.write(pickle.dumps(Tree()))
+        return
+
     start_time = min(time_dict.values())
     off_cpu_dict = defaultdict(list)
     off_cpu_path = Path('offcpu.data')
@@ -101,6 +104,9 @@ def trace_end():
     if off_cpu_path.exists():
         with off_cpu_path.open(mode='r') as f:
             for line in f:
+                if len(line.strip()) == 0:
+                    continue
+
                 pid, tid, time, length = line.strip().split(' ')
 
                 if time == '18446744069.414584320':
