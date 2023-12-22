@@ -12,9 +12,9 @@ docker-build:
   script:
     - |
       if [[ $CI_COMMIT_BRANCH == "main" ]]; then
-        export IMAGE_DESTINATION=gitlab-registry.cern.ch/syclops/adaptiveperfhtml:latest
+        export IMAGE_DESTINATION=gitlab-registry.cern.ch/adaptiveperf/adaptiveperfhtml:latest
       else
-        export IMAGE_DESTINATION=gitlab-registry.cern.ch/syclops/adaptiveperfhtml:$CI_COMMIT_BRANCH
+        export IMAGE_DESTINATION=gitlab-registry.cern.ch/adaptiveperf/adaptiveperfhtml:$CI_COMMIT_BRANCH
       fi
     # Prepare Kaniko configuration file
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_DEPLOY_USER\",\"password\":\"$CI_DEPLOY_PASSWORD\"}}}" > /kaniko/.docker/config.json
@@ -25,7 +25,7 @@ docker-build:
 
 docker-test:
   image:
-    name: gitlab-registry.cern.ch/syclops/adaptiveperfhtml:$CI_COMMIT_BRANCH
+    name: gitlab-registry.cern.ch/adaptiveperf/adaptiveperfhtml:$CI_COMMIT_BRANCH
     entrypoint: [""]
   rules:
     - if: $CI_COMMIT_BRANCH != "main"
@@ -36,7 +36,7 @@ docker-test:
 
 docker-test-main:
   image:
-    name: gitlab-registry.cern.ch/syclops/adaptiveperfhtml:latest
+    name: gitlab-registry.cern.ch/adaptiveperf/adaptiveperfhtml:latest
     entrypoint: [""]
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
