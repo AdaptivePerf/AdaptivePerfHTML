@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "adaptiveperf-html"
+version = "1.0"
+authors = [
+  { name="Maksymilian Graczyk", email="maksymilian.graczyk@cern.ch" },
+]
+description = "HTML summary producer for profiling results returned by AdaptivePerf"
+requires-python = ">=3.6"
+dependencies = [
+  "Jinja2",
+  "treelib",
+  "flask",
+  "gunicorn",
+  "pytest",
+  "pytest-mock"
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: POSIX :: Linux",
+]
+
+[project.scripts]
+adaptiveperf-html = "adaptiveperf.html:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/adaptiveperf"]

@@ -1,12 +1,14 @@
 # Based on https://gitlab.cern.ch/gitlabci-examples/build_docker_image/-/blob/master/.gitlab-ci.yml
 stages:
+  - build
+  - test
   - deploy
 
-syclops-pviewer-deploy:
+docker-build:
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
-  stage: deploy
+  stage: build
   script:
     - |
       if [[ $CI_COMMIT_BRANCH == "main" ]]; then
@@ -20,3 +22,19 @@ syclops-pviewer-deploy:
     - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $IMAGE_DESTINATION
     # Print the full registry path of the pushed image
     - echo "Image pushed successfully to ${IMAGE_DESTINATION}"
+
+docker-test:
+  image:
+    name: gitlab-registry.cern.ch/syclops/adaptiveperfhtml:$CI_COMMIT_BRANCH
+    entrypoint: [""]
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR
+    - pytest
+
+syclops-pviewer-deploy:
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - echo "Deployment goes here"
