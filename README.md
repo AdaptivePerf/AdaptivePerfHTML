@@ -13,7 +13,6 @@ Copyright (C) 2023 CERN. See ```LICENSE``` for more details.
 ### Requirements
 * Python 3.6 or newer
 * ```perf``` compiled with Python support
-* treelib Python package installed system-wide
 
 ### Setup
 This is a Python package, so you can install it with ```pip```:
