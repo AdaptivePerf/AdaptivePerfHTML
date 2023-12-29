@@ -154,7 +154,11 @@ class ProfilingResults:
 
         r.check_returncode()
 
-        tree = pickle.loads(r.stdout)
+        tree = Tree()
+        nodes = json.loads(r.stdout.decode())
+
+        for n in nodes:
+            tree.create_node(**n)
 
         self._thread_tree = tree
         return tree

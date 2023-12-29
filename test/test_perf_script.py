@@ -16,8 +16,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import subprocess
-import pickle
 import adaptiveperf
+import json
 from pathlib import Path
 from treelib import Tree
 
@@ -25,60 +25,60 @@ from treelib import Tree
 def test_correct_tree_produced():
     expected_tree = Tree()
     expected_tree.create_node(
-        ('a.out',
+        ['a.out',
          '23562/23562',
          [
-             (18489444, 12089161765),
-             (12107699221, 365438977),
-             (12482214823, 2005753385)
+             [18489444, 12089161765],
+             [12107699221, 365438977],
+             [12482214823, 2005753385]
          ],
          0,
-         14488135576), 23562)
+         14488135576], 23562)
     expected_tree.create_node(
-        ('a.out',
+        ['a.out',
          '23562/23563',
          [],
          5403012,
-         12102167996), 23563,
+         12102167996], 23563,
         parent=23562)
     expected_tree.create_node(
-        ('a.out',
+        ['a.out',
          '23562/23564',
          [
-             (15691478, 12457309240)
+             [15691478, 12457309240]
          ],
          8493492,
-         12464564036), 23564,
+         12464564036], 23564,
         parent=23562)
     expected_tree.create_node(
-        ('a.out',
+        ['a.out',
          '23562/23565',
          [],
          15159860,
-         12462205691), 23565,
+         12462205691], 23565,
         parent=23562)
     expected_tree.create_node(
-        ('a.out',
+        ['a.out',
          '23562/23566',
          [],
          15750325,
-         12457185335), 23566,
+         12457185335], 23566,
         parent=23564)
     expected_tree.create_node(
-        ('a.out',
+        ['a.out',
          '23562/23567',
          [],
          18554273,
-         12089656353), 23567,
+         12089656353], 23567,
         parent=23562)
     expected_tree.create_node(
-        ('sleep',
+        ['sleep',
          '23568/23568',
          [
-             (12486776576, 2000121224)
+             [12486776576, 2000121224]
          ],
          12485907530,
-         2001064202), 23568,
+         2001064202], 23568,
         parent=23562)
 
     r = subprocess.run(['perf', 'script', '-f', '-i',
@@ -92,7 +92,11 @@ def test_correct_tree_produced():
 
     r.check_returncode()
 
-    tree = pickle.loads(r.stdout)
+    tree = Tree()
+    json_nodes = json.loads(r.stdout.decode())
+
+    for n in json_nodes:
+        tree.create_node(**n)
 
     nodes = tree.all_nodes()
     expected_nodes = expected_tree.all_nodes()

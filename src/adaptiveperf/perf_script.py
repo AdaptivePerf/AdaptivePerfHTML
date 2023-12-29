@@ -12,10 +12,9 @@ from __future__ import print_function
 import os
 import sys
 import re
-import pickle
+import json
 from pathlib import Path
 from collections import defaultdict
-from treelib import Tree
 
 sys.path.append(os.environ['PERF_EXEC_PATH'] +
                 '/scripts/python/Perf-Trace-Util/lib/Perf/Trace')
@@ -26,8 +25,8 @@ time_dict = {}
 exit_time_dict = {}
 name_dict = {}
 
-trees = [Tree()]
-tree = trees[-1]
+tree = {}
+added_list = []
 
 profiled_filename = re.search(r'^\S+\s+(.+)$', Path().resolve().name).group(1)
 profile_start = False
@@ -47,28 +46,17 @@ def common_callback(comm_name, pid, tid, time, ret_value):
         time_dict[tid] = time
         name_dict[tid] = comm_name
     else:
-        if not tree.contains(tid):
-            found = False
-            for t in trees:
-                if t.contains(tid):
-                    found = True
-                    tree = t
-                    break
+        if tid not in tree:
+            tree[tid] = None
+            added_list.append(tid)
 
-            if not found:
-                if tree.root is not None:
-                    trees.append(Tree())
-                    tree = trees[-1]
+            combo_dict[tid] = f'{pid}/{tid}'
+            process_group_dict[pid].append(tid)
+            name_dict[tid] = comm_name
 
-                tree.create_node(tid, tid)
-                tree.root = tid
-
-                combo_dict[tid] = f'{pid}/{tid}'
-                process_group_dict[pid].append(tid)
-                name_dict[tid] = comm_name
-
-        if not tree.contains(ret_value):
-            tree.create_node(ret_value, ret_value, parent=tid)
+        if ret_value not in tree:
+            tree[ret_value] = tid
+            added_list.append(ret_value)
 
 
 def execve_callback(comm_name, pid, tid, time, ret_value):
@@ -94,7 +82,7 @@ def exit_callback(comm_name, pid, tid, time, exit_group):
 
 def trace_end():
     if len(time_dict) == 0:
-        sys.stdout.buffer.write(pickle.dumps(Tree()))
+        print(json.dumps([]))
         return
 
     start_time = min(time_dict.values())
@@ -119,14 +107,20 @@ def trace_end():
 
                 off_cpu_dict[tid].append((time - start_time, length))
 
-    for n in tree.all_nodes_itr():
-        i = n.identifier
-        n.tag = (name_dict[i], combo_dict[i], off_cpu_dict[i],
-                 time_dict[i] - start_time,
-                 exit_time_dict[i] -
-                 time_dict[i] if i in exit_time_dict else -1)
+    result = []
 
-    sys.stdout.buffer.write(pickle.dumps(tree))
+    for i in added_list:
+        p = tree[i]
+        result.append({
+            'identifier': i,
+            'tag': [name_dict[i], combo_dict[i], off_cpu_dict[i],
+                    time_dict[i] - start_time,
+                    exit_time_dict[i] -
+                    time_dict[i] if i in exit_time_dict else -1],
+            'parent': p
+        })
+
+    print(json.dumps(result))
 
 
 def syscalls__sys_exit_clone3(event_name, context, common_cpu, common_secs,
