@@ -9,6 +9,8 @@ All feedback is welcome.
 ## License
 Copyright (C) 2023 CERN. See ```LICENSE``` for more details.
 
+**Please note that the project is licensed under GNU GPL v2 only (no other versions).**
+
 ## Installation
 ### Requirements
 * Python 3.6 or newer
