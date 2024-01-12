@@ -46,8 +46,17 @@ docker-test-main:
     - pytest
 
 syclops-pviewer-deploy:
+  # Based on https://paas.docs.cern.ch/2._Deploy_Applications/Deploy_Docker_Image/2-automatic-redeployments/#integrate-redeployment-in-ci-workflow
   stage: deploy
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+  image: gitlab-registry.cern.ch/paas-tools/openshift-client:latest
+  variables:
+    SERVER: https://api.paas.okd.cern.ch
+    PROJECT: syclops-pviewer
+    APP_NAME: profilingviewer
   script:
-    - echo "Deployment goes here"
+    - oc login $SERVER --token=$DEPLOY_TOKEN
+    - oc project $PROJECT
+    - oc import-image $APP_NAME --all
+    - sleep 10 && oc rollout status deployment/$APP_NAME
