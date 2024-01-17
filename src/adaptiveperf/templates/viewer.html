@@ -32,7 +32,8 @@
               function parseResult(result) {
                   function from_json_to_item(json, level,
                                              item_list, group_list,
-                                             item_dict, callchain_dict) {
+                                             item_dict, metrics_dict,
+                                             callchain_dict) {
                       var color_scale = Math.max(0, 255 - (json.runtime - json.sampled_time) / json.sampled_time * 255);
 
                       var item = {
@@ -52,7 +53,7 @@
                           showNested: false
                       };
 
-                      var nestedGroups = []
+                      var nestedGroups = [];
 
                       for (var i = 0; i < json.children.length; i++) {
                           nestedGroups.push(json.children[i].id);
@@ -66,6 +67,7 @@
                       group_list.push(group);
 
                       item_dict[item.id] = json.name + ' (' + json.pid_tid + '):<br />' + '~' + json.sampled_time.toFixed(3) + ' ms + ~' + (json.runtime - json.sampled_time).toFixed(3) + ' ms (extra time due to preemption and sampling accuracy)';
+                      metrics_dict[item.id] = json.metrics;
 
                       if (level > 0) {
                           callchain_dict[item.id] = json.start_callchain;
@@ -91,6 +93,7 @@
                                             item_list,
                                             group_list,
                                             item_dict,
+                                            metrics_dict,
                                             callchain_dict);
                       }
                   }
@@ -101,9 +104,11 @@
                   var group_list = [];
                   var item_dict = {};
                   var callchain_dict = {};
+                  var metrics_dict = {};
 
                   from_json_to_item(JSON.parse(result), 0,
                                     item_list, group_list, item_dict,
+                                    metrics_dict,
                                     callchain_dict);
 
                   var container = document.getElementById('block');
@@ -134,6 +139,15 @@
                   timeline.on('doubleClick', function (props) {
                       if (props.group != null) {
                           $('#flamegraph_title').html(item_dict[props.group]);
+
+                          $('#metric').empty();
+                          $('#metric').append(new Option('Wall time (us)', 'walltime'));
+
+                          // Based on https://stackoverflow.com/a/2553045
+                          $.each(metrics_dict[props.group], function (val, text) {
+                              $('#metric').append(new Option(text, val));
+                          });
+
                           $('#metric').val('walltime');
                           $('#time_ordered').prop("checked", false);
                           $('#svg').attr('data', $('#block').attr('result_id') + {% if local %}'/processed/'{% else %}'/'{% endif %} + props.group + '_walltime.svg');
@@ -192,7 +206,6 @@
 
       function onSVGLoad() {
           $('#no_flamegraph').hide();
-          $('#flamegraph_choice').show();
           $('#flamegraph_background').show();
           var svg = document.getElementById('flamegraph');
           svg.scrollTop = svg.scrollHeight;
@@ -201,20 +214,22 @@
       function onSVGError() {
           if ($('#svg').attr('data') != '') {
               $('#no_flamegraph').show();
-              $('#flamegraph_choice').hide();
               $('#flamegraph_background').show();
           }
       }
 
       function onMetricChange(event) {
-
+          var metric = event.currentTarget.value;
+          $('#svg').attr('data', $('#block').attr('result_id') + {% if local %}'/processed/'{% else %}'/'{% endif %} + $('#flamegraph').attr('data-id') + '_' + metric + ($('#time_ordered').prop('checked') ? '_chart' : '') + '.svg');
       }
 
       function onTimeOrderedChange(event) {
+          var metric = $('#metric').val();
+
           if (event.currentTarget.checked) {
-              $('#svg').attr('data', $('#block').attr('result_id') + {% if local %}'/processed/'{% else %}'/'{% endif %} + $('#flamegraph').attr('data-id') + '_walltime_chart.svg');
+              $('#svg').attr('data', $('#block').attr('result_id') + {% if local %}'/processed/'{% else %}'/'{% endif %} + $('#flamegraph').attr('data-id') + '_' + metric + '_chart.svg');
           } else {
-              $('#svg').attr('data', $('#block').attr('result_id') + {% if local %}'/processed/'{% else %}'/'{% endif %} + $('#flamegraph').attr('data-id') + '_walltime.svg');
+              $('#svg').attr('data', $('#block').attr('result_id') + {% if local %}'/processed/'{% else %}'/'{% endif %} + $('#flamegraph').attr('data-id') + '_' + metric + '.svg');
           }
       }
     </script>
@@ -382,15 +397,15 @@
           <p style="font-style:italic; text-align:center">Click anywhere outside of the window to close it.</p>
         </div>
         <div id="flamegraph_choice">
-          Metric: 
+          Metric:
           <select name="metric" id="metric" onchange="onMetricChange(event)">
-            <option value="walltime">Wall time (us)</option>
+
           </select>
           <input type="checkbox" id="time_ordered" name="time_ordered" onchange="onTimeOrderedChange(event)">
           <label for="time_ordered">Time-ordered</label>
         </div>
         <div id="flamegraph" class="scrollable">
-          <p id="no_flamegraph">There is no flame graph associated with the selected process/thread (or the flame graph could not be loaded)! This may be caused by the running time of the process/thread being too short for the profiling tools to catch it.</p>
+          <p id="no_flamegraph">There is no flame graph associated with the selected process/thread, metric, and time order (or the flame graph could not be loaded)! This may be caused by the inability of capturing a specific event for that process/thread (it is a disadvantage of sampling-based profiling).</p>
           <object id="svg" data="" onload="onSVGLoad()" onerror="onSVGError()"></object>
         </div>
       </div>
