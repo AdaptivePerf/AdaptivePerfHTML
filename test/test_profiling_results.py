@@ -76,6 +76,7 @@ def test_get_json_tree_only_root(results_dir_and_identifier, mocker):
         'pid_tid': '2394/129',
         'off_cpu': [(0.000002, 0.002412), (0.002415, 0.000002)],
         'start_callchain': [],
+        'metrics': {},
         'children': []
     })
 
@@ -99,6 +100,9 @@ def test_get_json_tree():
                     (12107.699221, 365.438977),
                     (12482.214823, 2005.753385)],
         'start_callchain': ['_Fork', 'make_child', 'execute_disk_command', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_in_subshell', 'execute_command_internal', 'execute_command_internal', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_command_internal', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command_internal', 'execute_function', 'execute_command_internal', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command', 'execute_connection', 'execute_command_internal', 'execute_command_internal', 'execute_function', 'execute_command_internal', 'execute_command', 'execute_command_internal', 'execute_connection', 'execute_command_internal', 'execute_command_internal', 'execute_function', 'execute_command_internal', 'execute_command', 'reader_loop', 'main', '__libc_start_call_main', '__libc_start_main@@GLIBC_2.34', '_start'],
+        'metrics': {'extra_page-faults': 'Page faults',
+                    'extra_cpu-cycles': 'CPU cycles',
+                    'extra_branch-misses': 'Branch misses'},
         'children': [
             {
                 'id': '23562_23563',
@@ -109,6 +113,9 @@ def test_get_json_tree():
                 'pid_tid': '23562/23563',
                 'off_cpu': [],
                 'start_callchain': ['clone3', 'create_thread', 'pthread_create@GLIBC_2.2.5', 'create', 'main', '__libc_start_call_main', '__libc_start_main@@GLIBC_2.34', '_start'],
+                'metrics': {'extra_page-faults': 'Page faults',
+                            'extra_cpu-cycles': 'CPU cycles',
+                            'extra_branch-misses': 'Branch misses'},
                 'children': []
             },
             {
@@ -120,6 +127,9 @@ def test_get_json_tree():
                 'pid_tid': '23562/23564',
                 'off_cpu': [(15.691478, 12457.309240)],
                 'start_callchain': ['clone3', 'create_thread', 'pthread_create@GLIBC_2.2.5', 'create', 'main', '__libc_start_call_main', '__libc_start_main@@GLIBC_2.34', '_start'],
+                'metrics': {'extra_page-faults': 'Page faults',
+                            'extra_cpu-cycles': 'CPU cycles',
+                            'extra_branch-misses': 'Branch misses'},
                 'children': [
                     {
                         'id': '23562_23566',
@@ -130,6 +140,9 @@ def test_get_json_tree():
                         'pid_tid': '23562/23566',
                         'off_cpu': [],
                         'start_callchain': ['clone3', 'create_thread', 'pthread_create@GLIBC_2.2.5', 'test', 'start_thread', 'clone3'],
+                        'metrics': {'extra_page-faults': 'Page faults',
+                                    'extra_cpu-cycles': 'CPU cycles',
+                                    'extra_branch-misses': 'Branch misses'},
                         'children': []
                     }
                 ]
@@ -143,6 +156,9 @@ def test_get_json_tree():
                 'pid_tid': '23562/23565',
                 'off_cpu': [],
                 'start_callchain': ['clone3', 'create_thread', 'pthread_create@GLIBC_2.2.5', 'create', 'main', '__libc_start_call_main', '__libc_start_main@@GLIBC_2.34', '_start'],
+                'metrics': {'extra_page-faults': 'Page faults',
+                            'extra_cpu-cycles': 'CPU cycles',
+                            'extra_branch-misses': 'Branch misses'},
                 'children': []
             },
             {
@@ -154,6 +170,9 @@ def test_get_json_tree():
                 'pid_tid': '23562/23567',
                 'off_cpu': [],
                 'start_callchain': ['clone3', 'create_thread', 'pthread_create@GLIBC_2.2.5', 'create', 'main', '__libc_start_call_main', '__libc_start_main@@GLIBC_2.34', '_start'],
+                'metrics': {'extra_page-faults': 'Page faults',
+                            'extra_cpu-cycles': 'CPU cycles',
+                            'extra_branch-misses': 'Branch misses'},
                 'children': []
             },
             {
@@ -165,6 +184,9 @@ def test_get_json_tree():
                 'pid_tid': '23568/23568',
                 'off_cpu': [(12486.776576, 2000.121224)],
                 'start_callchain': ['clone3', '__spawnix', '__spawni', '(0x0)'],
+                'metrics': {'extra_page-faults': 'Page faults',
+                            'extra_cpu-cycles': 'CPU cycles',
+                            'extra_branch-misses': 'Branch misses'},
                 'children': []
             }
         ]
