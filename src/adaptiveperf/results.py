@@ -125,6 +125,16 @@ class ProfilingResults:
         with (self._path / 'new_proc_callchains.data').open(mode='r') as f:
             self._start_callchains = json.load(f)
 
+        metrics_path = self._path / 'event_dict.data'
+
+        self._metrics = {}
+
+        if metrics_path.exists():
+            with metrics_path.open(mode='r') as f:
+                for line in f:
+                    match = re.search(r'^(\S+) (.+)$',  line.strip())
+                    self._metrics['extra_' + match.group(1)] = match.group(2)
+
     def get_thread_tree(self) -> Tree:
         if self._thread_tree is not None:
             return self._thread_tree
@@ -188,6 +198,7 @@ class ProfilingResults:
                 'off_cpu': offcpu_regions,
                 'start_callchain': self._start_callchains.get(
                     pid_tid.split('/')[1], []),
+                'metrics': self._metrics,
                 'children': []
             }
 
