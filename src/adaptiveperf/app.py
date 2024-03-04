@@ -23,8 +23,7 @@ def get(identifier, path):
 
         return send_from_directory(os.path.join(
             app.config['PROFILING_STORAGE'],
-            identifier,
-            'processed'), path)
+            identifier), path)
     except ValueError:
         return '', 404
 
@@ -50,4 +49,4 @@ def main():
     return render_template('viewer.html',
                            ids=ProfilingResults.get_all_ids(
                                app.config['PROFILING_STORAGE']),
-                           local=False)
+                           local=False, tolerance=0.5)
