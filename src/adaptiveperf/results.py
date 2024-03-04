@@ -122,8 +122,8 @@ class ProfilingResults:
         self._path = Path(profiling_storage) / identifier
         self._thread_tree = None
 
-        with (self._path / 'new_proc_callchains.data').open(mode='r') as f:
-            self._start_callchains = json.load(f)
+        with (self._path / 'processed' / 'metadata.json').open(mode='r') as f:
+            self._metadata = json.load(f)
 
         metrics_path = self._path / 'event_dict.data'
 
@@ -139,51 +139,35 @@ class ProfilingResults:
         if self._thread_tree is not None:
             return self._thread_tree
 
-        r = subprocess.run(['perf', 'script', '-f', '-i',
-                            'syscalls.data', '-s',
-                            Path(__file__).resolve().parent /
-                            'perf_script.py'],
-                           cwd=self._path, stdout=subprocess.PIPE)
-
-        r.check_returncode()
-
         tree = Tree()
-        nodes = json.loads(r.stdout.decode())
 
-        for n in nodes:
+        for n in self._metadata['thread_tree']:
             tree.create_node(**n)
 
         self._thread_tree = tree
         return tree
 
-    def _get_sampled_time(self, pid_tid):
-        sampled_time_path = self._path / 'processed' / \
-            f'{pid_tid.replace("/", "_")}_sampled_time.data'
-
-        if sampled_time_path.exists() and \
-           len(sampled_time_path.read_text()) > 0:
-            return float(sampled_time_path.read_text())
-        else:
-            return None
-
     def get_json_tree(self):
+        def to_ms(num):
+            return None if num is None else num / 1000000
+
         tree = self.get_thread_tree()
 
         def node_to_dict(node):
-            process_name, pid_tid, offcpu_regions, \
-                start_time, runtime = node.tag
+            process_name, pid_tid, start_time, runtime = node.tag
+            pid_tid_code = pid_tid.replace('/', '_')
 
-            # Convert times to milliseconds
-            start_time /= 1000000
+            start_time = to_ms(start_time)
             if runtime != -1:
-                runtime /= 1000000
-            # End
+                runtime = to_ms(runtime)
 
-            offcpu_regions = list(map(lambda x: (x[0] / 1000000,
-                                                 x[1] / 1000000),
-                                      offcpu_regions))
+            offcpu_regions = list(
+                map(lambda x: (to_ms(x[0] - self._metadata['start_time']),
+                               to_ms(x[1])),
+                    self._metadata['offcpu_regions'].get(pid_tid_code, [])))
 
-            total_sampled_time = self._get_sampled_time(pid_tid)
+            total_sampled_time = \
+                to_ms(self._metadata['sampled_times'].get(pid_tid_code, None))
 
             if total_sampled_time is None:
                 total_sampled_time = runtime
@@ -196,7 +180,7 @@ class ProfilingResults:
                 'name': process_name,
                 'pid_tid': pid_tid,
                 'off_cpu': offcpu_regions,
-                'start_callchain': self._start_callchains.get(
+                'start_callchain': self._metadata['callchains'].get(
                     pid_tid.split('/')[1], []),
                 'metrics': self._metrics,
                 'children': []
