@@ -191,7 +191,8 @@
 
                   timeline.on('contextmenu', function (props) {
                       if (props.group != null && props.group in callchain_dict) {
-                          $('#callchain').html(callchain_dict[props.group].join("<br />"));
+                          $('#callchain').text(callchain_dict[props.group].join("\n"));
+                          $('#callchain').html($('#callchain').html().replace(/\n/g, "<br />"));
                           $('#callchain_block_title').html(tooltip_dict[props.group]);
                           $('#callchain_block').css('top', props.pageY);
                           $('#callchain_block').css('left', props.pageX);
