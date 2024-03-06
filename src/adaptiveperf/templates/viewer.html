@@ -240,6 +240,7 @@
           $('#no_flamegraph').hide();
           $('#svg').html('');
           $('#flamegraph_background').show();
+          flamegraph_obj.width($('#flamegraph_block').width());
           d3.select('#svg').datum(result_obj[$('#metric').val()][$('#time_ordered').prop('checked') ? 1 : 0]).call(flamegraph_obj);
       }
 
