@@ -233,8 +233,8 @@
 
       function openFlameGraph(result) {
           flamegraph_obj = flamegraph();
-        flamegraph_obj.color(function(node, original_color) {
-               return node.highlight || !node.data.cold ? original_color : "#039dfc";
+          flamegraph_obj.color(function(node, original_color) {
+              return node.highlight || !node.data.cold ? original_color : "#039dfc";
           });
           result_obj = result;
           $('#no_flamegraph').hide();
