@@ -1,3 +1,6 @@
+# AdaptivePerfHTML: Tool for producing HTML summary of AdaptivePerf results
+# Copyright (C) CERN. See LICENSE for details.
+
 import os
 from flask import Flask, render_template, request, send_from_directory
 from . import ProfilingResults, Identifier
