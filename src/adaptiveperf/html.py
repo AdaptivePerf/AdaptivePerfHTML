@@ -1,3 +1,6 @@
+# AdaptivePerfHTML: Tool for producing HTML summary of AdaptivePerf results
+# Copyright (C) CERN. See LICENSE for details.
+
 import sys
 import shutil
 import html
