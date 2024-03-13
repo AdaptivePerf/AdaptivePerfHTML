@@ -23,8 +23,5 @@ classifiers = [
   "Operating System :: POSIX :: Linux",
 ]
 
-[project.scripts]
-adaptiveperf-html = "adaptiveperf.html:main"
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/adaptiveperf"]
