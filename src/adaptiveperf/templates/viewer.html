@@ -2,7 +2,7 @@
     AdaptivePerfHTML: Tool for producing HTML summary of AdaptivePerf results
     Copyright (C) CERN. See LICENSE for details.
 -->
-    
+
 <!DOCTYPE html>
 <html>
   <head>
@@ -30,6 +30,8 @@
     <script type="application/javascript">
       var flamegraph_obj = undefined;
       var result_obj = undefined;
+      var callchain_obj = undefined;
+      var spawning_callchain_obj = undefined;
 
       $(document).on('change', '#results_combobox', function() {
           $('#results_combobox option:selected').each(function() {
@@ -91,17 +93,25 @@
                       }
 
                       for (var i = 0; i < json.off_cpu.length; i++) {
-                          var off_cpu_item = {
-                              id: json.id + '_offcpu' + i,
-                              group: json.id,
-                              type: 'background',
-                              content: '',
-                              start: json.off_cpu[i][0],
-                              end: json.off_cpu[i][0] + json.off_cpu[i][1],
-                              style: 'background-color:#0294e3'
-                          };
+                          var start = json.off_cpu[i][0];
+                          var end = start + json.off_cpu[i][1];
+                          var offcpu_sampling = {{ offcpu_sampling }};
 
-                          item_list.push(off_cpu_item);
+                          if (start % offcpu_sampling == 0 ||
+                              end % offcpu_sampling == 0 ||
+                              Math.floor(start / offcpu_sampling) != Math.floor(end / offcpu_sampling)) {
+                              var off_cpu_item = {
+                                  id: json.id + '_offcpu' + i,
+                                  group: json.id,
+                                  type: 'background',
+                                  content: '',
+                                  start: json.off_cpu[i][0],
+                                  end: json.off_cpu[i][0] + json.off_cpu[i][1],
+                                  style: 'background-color:#0294e3'
+                              };
+
+                              item_list.push(off_cpu_item);
+                          }
                       }
 
                       for (var i = 0; i < json.children.length; i++) {
@@ -118,6 +128,14 @@
                   }
 
                   $('#block').attr('result_id', value);
+
+                  $.ajax({
+                      url: $('#block').attr('result_id') + '/processed/syscall_callchains.json',
+                      method: 'GET',
+                      dataType: 'json'
+                  }).done(ajax_obj => { spawning_callchain_obj = ajax_obj; }).fail(ajax_obj => {
+                      alert('Could not obtain the spawning callchain dictionary! You will not get meaningful names when checking spawning stack traces.');
+                  });
 
                   var item_list = [];
                   var group_list = [];
@@ -185,7 +203,18 @@
                               url: $('#block').attr('result_id') + '/processed/' + props.group + '.json',
                               method: 'GET',
                               dataType: 'json'
-                          }).done(openFlameGraph).fail(ajax_obj => {
+                          }).done(ajax_obj => {
+                              $.ajax({
+                                  url: $('#block').attr('result_id') + '/processed/walltime_callchains.json',
+                                  method: 'GET',
+                                  dataType: 'json'
+                              }).done(ajax_obj2 => openFlameGraph(ajax_obj, ajax_obj2)).fail(ajax_obj => {
+                                  flamegraph_obj = undefined;
+                                  $('#svg').hide();
+                                  $('#no_flamegraph').show();
+                                  $('#flamegraph_background').show();
+                              });
+                          }).fail(ajax_obj => {
                               flamegraph_obj = undefined;
                               $('#svg').hide();
                               $('#no_flamegraph').show();
@@ -196,7 +225,15 @@
 
                   timeline.on('contextmenu', function (props) {
                       if (props.group != null && props.group in callchain_dict) {
-                          $('#callchain').text(callchain_dict[props.group].join("\n"));
+                          $('#callchain').text(callchain_dict[props.group].map(elem => {
+                              if (spawning_callchain_obj !== undefined && elem in spawning_callchain_obj) {
+                                  return spawning_callchain_obj[elem];
+                              } else if (/^\[.+\]$/.test(elem) || /^\(0x[0-9a-f]+\)$/.test(elem)) {
+                                  return elem;
+                              } else {
+                                  return elem + " (not-yet-loaded or missing callchain dictionary)";
+                              }
+                          }).join("\n"));
                           $('#callchain').html($('#callchain').html().replace(/\n/g, "<br />"));
                           $('#callchain_block_title').html(tooltip_dict[props.group]);
                           $('#callchain_block').css('top', props.pageY);
@@ -236,10 +273,18 @@
           });
       });
 
-      function openFlameGraph(result) {
+      function openFlameGraph(result, callchains) {
+          callchain_obj = callchains;
           flamegraph_obj = flamegraph();
           flamegraph_obj.color(function(node, original_color) {
               return node.highlight || !node.data.cold ? original_color : "#039dfc";
+          });
+          flamegraph_obj.getName(function(node) {
+              if (node.data.name in callchain_obj) {
+                  return callchain_obj[node.data.name];
+              } else {
+                  return node.data.name;
+              }
           });
           result_obj = result;
           $('#no_flamegraph').hide();
@@ -265,7 +310,18 @@
               var metric = event.currentTarget.value;
 
               if (metric in result_obj) {
-                  d3.select('#svg').datum(result_obj[metric][$('#time_ordered').prop('checked') ? 1 : 0]).call(flamegraph_obj);
+                  $.ajax({
+                      url: $('#block').attr('result_id') + '/processed/' + metric + '_callchains.json',
+                      method: 'GET',
+                      dataType: 'json'
+                  }).done(ajax_obj => {
+                      callchain_obj = ajax_obj;
+                      d3.select('#svg').datum(result_obj[metric][$('#time_ordered').prop('checked') ? 1 : 0]).call(flamegraph_obj);
+                  }).fail(ajax_obj => {
+                      $('#svg').hide();
+                      $('#no_flamegraph').show();
+                  });
+
               } else {
                   $('#svg').hide();
                   $('#no_flamegraph').show();
