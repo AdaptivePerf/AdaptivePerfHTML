@@ -128,7 +128,7 @@ class ProfilingResults:
         with (self._path / 'processed' / 'metadata.json').open(mode='r') as f:
             self._metadata = json.load(f)
 
-        metrics_path = self._path / 'event_dict.data'
+        metrics_path = self._path / 'out' / 'event_dict.data'
 
         self._metrics = {}
 
@@ -136,7 +136,7 @@ class ProfilingResults:
             with metrics_path.open(mode='r') as f:
                 for line in f:
                     match = re.search(r'^(\S+) (.+)$',  line.strip())
-                    self._metrics['extra_' + match.group(1)] = match.group(2)
+                    self._metrics[match.group(1)] = match.group(2)
 
     def get_thread_tree(self) -> Tree:
         if self._thread_tree is not None:
