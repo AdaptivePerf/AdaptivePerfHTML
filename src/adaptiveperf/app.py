@@ -52,4 +52,7 @@ def main():
     return render_template('viewer.html',
                            ids=ProfilingResults.get_all_ids(
                                app.config['PROFILING_STORAGE']),
-                           local=False, tolerance=0.5, offcpu_sampling=500)
+                           local=False,
+                           tolerance=app.config.get('TOLERANCE', 0.5),
+                           offcpu_sampling=app.config.get(
+                               'OFFCPU_SAMPLING', 500))
