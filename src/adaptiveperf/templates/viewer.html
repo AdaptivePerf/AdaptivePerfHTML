@@ -64,7 +64,7 @@
                       var group = {
                           id: json.id,
                           content: json.name + ' (' + json.pid_tid + ')',
-                          style: 'padding-left: ' + (level * 25) + 'px;' + (warning ? " color:red;" : ""),
+                          style: 'padding-left: ' + (level * 25) + 'px;' + (warning ? ' color:red;' : ''),
                           showNested: false
                       };
 
@@ -196,7 +196,7 @@
                           });
 
                           $('#metric').val('walltime');
-                          $('#time_ordered').prop("checked", false);
+                          $('#time_ordered').prop('checked', false);
                           $('#flamegraph').attr('data-id', props.group);
 
                           $.ajax({
@@ -231,10 +231,10 @@
                               } else if (/^\[.+\]$/.test(elem) || /^\(0x[0-9a-f]+\)$/.test(elem)) {
                                   return elem;
                               } else {
-                                  return elem + " (not-yet-loaded or missing callchain dictionary)";
+                                  return elem + ' (not-yet-loaded or missing callchain dictionary)';
                               }
-                          }).join("\n"));
-                          $('#callchain').html($('#callchain').html().replace(/\n/g, "<br />"));
+                          }).join('\n'));
+                          $('#callchain').html($('#callchain').html().replace(/\n/g, '<br />'));
                           $('#callchain_block_title').html(tooltip_dict[props.group]);
                           $('#callchain_block').css('top', props.pageY);
                           $('#callchain_block').css('left', props.pageX);
@@ -277,7 +277,7 @@
           callchain_obj = callchains;
           flamegraph_obj = flamegraph();
           flamegraph_obj.color(function(node, original_color) {
-              return node.highlight || !node.data.cold ? original_color : "#039dfc";
+              return node.highlight || !node.data.cold ? original_color : '#039dfc';
           });
           flamegraph_obj.getName(function(node) {
               if (node.data.name in callchain_obj) {
@@ -289,6 +289,7 @@
           result_obj = result;
           $('#no_flamegraph').hide();
           $('#svg').html('');
+          $('#svg').show();
           $('#flamegraph_background').show();
           flamegraph_obj.width($('#flamegraph_block').width());
           d3.select('#svg').datum(result_obj[$('#metric').val()][$('#time_ordered').prop('checked') ? 1 : 0]).call(flamegraph_obj);
@@ -316,6 +317,15 @@
                       dataType: 'json'
                   }).done(ajax_obj => {
                       callchain_obj = ajax_obj;
+
+                      if (metric == 'walltime') {
+                          flamegraph_obj.setColorHue('warm');
+                      } else {
+                          flamegraph_obj.setColorHue('green');
+                      }
+
+                      $('#no_flamegraph').hide();
+                      $('#svg').show();
                       d3.select('#svg').datum(result_obj[metric][$('#time_ordered').prop('checked') ? 1 : 0]).call(flamegraph_obj);
                   }).fail(ajax_obj => {
                       $('#svg').hide();

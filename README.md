@@ -16,7 +16,7 @@ The project is distributed under the GNU GPL v3 license. See LICENSE for details
 
 ## Installation
 ### Requirements
-* Python 3.6 or newer
+Python 3.6 or newer. All other dependencies are installed automatically when installing AdaptivePerfHTML.
 
 ### Setup
 This is a Python package, so you can install it with ```pip```:
@@ -25,17 +25,7 @@ pip install git+https://gitlab.cern.ch/adaptiveperf/AdaptivePerfHTML
 ```
 
 ## How to use
-AdaptivePerfHTML can be used either as a standalone tool for producing local HTML summaries or as a Flask app for hosting a website displaying the results of all profiling sessions run so far in a given environment.
-
-Both ways indicated below result in the same website layout.
-
-### Standalone tool
-```adaptiveperf-html``` is the command-line script for generating a local HTML summary of your profiling sessions. Please run it with the path to the ```results``` directory created by AdaptivePerf, for example:
-```
-adaptiveperf-html test/results
-```
-
-Afterwards, you'll be able to open the index.html file inside the specified ```results``` directory in your web browser.
+AdaptivePerfHTML can be used as a Flask app for hosting a website displaying the results of all profiling sessions run so far in a given environment.
 
 ### Flask app
 Firstly, set the ```FLASK_PROFILING_STORAGE``` environment variable to the path to the ```results``` directory created by AdaptivePerf. Then, start Flask and point it to ```adaptiveperf.app:app```.
