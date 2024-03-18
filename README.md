@@ -21,7 +21,7 @@ Python 3.6 or newer. All other dependencies are installed automatically when ins
 ### Setup
 This is a Python package, so you can install it with ```pip```:
 ```
-pip install git+https://gitlab.cern.ch/adaptiveperf/AdaptivePerfHTML
+pip install git+https://github.com/AdaptivePerf/AdaptivePerfHTML
 ```
 
 ## How to use
@@ -41,8 +41,8 @@ More detailed documentation and usage instructions are coming soon!
 In the meantime, here's the quick getting started guide after opening the website:
 1. Select your profiling session from the "Please select a test executed by the CI" combobox and wait untli the timeline loads.
 2. In the timeline, you can browse the thread/process tree (including expanding and collapsing threads/processes) on the left and see how long the thread/process ran for on the right in form of timeline blocks. The time axis is in milliseconds.
-3. Each block indicates the name of the process, its PID, TID, its runtime as sampled by ```perf```, and the difference between the sampled time and the actual time (as measured between the relevant start and exit syscalls).
+3. Each thread/process has a corresponding name, PID, and TID.
 4. Each block has red and blue parts. Red parts correspond to on-CPU activity while blue parts correspond to off-CPU activity. Not every off-CPU activity may be shown on the timeline, depending on the sampling rate chosen when running AdaptivePerf.
 5. Some threads/processes may be marked as red. This means that the difference between the sampled and exact runtime of a given thread/process is significant, resulting in potentially lower accuracy of corresponding flame graphs and flame charts.
-6. Right-click a thread/process block to open the stack trace of a function which spawned that thread/process.
+6. Right-click a thread/process block to check the exact runtime of the thread/process (as measured between the relevant start and exit syscalls), the ```perf```-sampled runtime, and the stack trace of a function which spawned the thread/process.
 7. Double-click a thread/process block to open the browser of flame graphs/charts corresponding to the thread/process.
