@@ -1,4 +1,4 @@
-FROM gitlab-registry.cern.ch/adaptiveperf/linux/python-with-perf:latest
+FROM python:latest
 
 WORKDIR /app
 RUN mkdir adaptiveperf-html
