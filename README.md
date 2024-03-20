@@ -1,5 +1,5 @@
 # AdaptivePerfHTML
-A tool for producing the HTML summary of profiling results returned by AdaptivePerf.
+A tool for producing the HTML summary of profiling results returned e.g. by AdaptivePerf.
 
 ## Recent redesign
 AdaptivePerfHTML has been redesigned recently and its documentation and build system are not updated/reverified yet. The documentation will be fully reverified soon!
