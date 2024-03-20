@@ -2,7 +2,7 @@ FROM python:latest
 
 WORKDIR /app
 RUN mkdir adaptiveperf-html
-COPY * adaptiveperf-html/
+COPY . adaptiveperf-html/
 RUN pip install adaptiveperf-html/ && rm -rf adaptiveperf-html
 RUN chgrp -R 0 /app && chmod -R g+rwX /app
 

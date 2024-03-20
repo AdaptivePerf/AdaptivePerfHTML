@@ -24,4 +24,9 @@ classifiers = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/adaptiveperf"]
+only-include = ["src/adaptiveperf"]
+sources = ["src"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/adaptiveperf"]
+sources = ["src"]
