@@ -32,7 +32,7 @@ class Identifier:
             self._second = match.group(1)
             executor_and_name = match.group(2)
 
-        match = re.search(r'^(\S+) (.+)$', executor_and_name)
+        match = re.search(r'^(\S+)__(.+)$', executor_and_name)
 
         if match is None:
             raise ValueError('Invalid id_str (incorrect executor and name)!')
