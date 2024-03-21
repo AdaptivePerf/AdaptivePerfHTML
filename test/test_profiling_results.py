@@ -7,7 +7,7 @@ from adaptiveperf import ProfilingResults, Identifier
 
 @pytest.fixture()
 def results_dir_and_identifier(tmp_path):
-    identifier = '2023_12_10_11_13_14_test test2'
+    identifier = '2023_12_10_11_13_14_test__test2'
     (tmp_path / identifier).mkdir()
 
     with (tmp_path / identifier / 'new_proc_callchains.data').open(
@@ -23,9 +23,9 @@ def test_get_all_ids_empty(tmp_path):
 
 def test_get_all_ids(tmp_path):
     expected_ids = [
-        Identifier('2023_10_11_12_05_19_test test2'),
-        Identifier('2021_04_30_23_59_58_another-test test.test.test'),
-        Identifier('1999_01_02_00_05_computer command')
+        Identifier('2023_10_11_12_05_19_test__test2'),
+        Identifier('2021_04_30_23_59_58_another-test__test.test.test'),
+        Identifier('1999_01_02_00_05_computer__command')
     ]
 
     for i in expected_ids:

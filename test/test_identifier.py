@@ -18,7 +18,7 @@ def test_incorrect_id_str3():
 
 
 def test_id_str_no_seconds():
-    identifier = Identifier('2023_10_11_15_18_blabla_blabla test')
+    identifier = Identifier('2023_10_11_15_18_blabla_blabla__test')
 
     assert str(identifier) == '[blabla_blabla] test (2023-10-11 15:18)'
     assert identifier.year == 2023
@@ -29,11 +29,11 @@ def test_id_str_no_seconds():
     assert identifier.second is None
     assert identifier.executor == 'blabla_blabla'
     assert identifier.name == 'test'
-    assert identifier.value == '2023_10_11_15_18_blabla_blabla test'
+    assert identifier.value == '2023_10_11_15_18_blabla_blabla__test'
 
 
 def test_id_str_with_seconds():
-    identifier = Identifier('2023_10_11_15_18_33_blabla_blabla test')
+    identifier = Identifier('2023_10_11_15_18_33_blabla_blabla__test')
 
     assert str(identifier) == '[blabla_blabla] test (2023-10-11 15:18:33)'
     assert identifier.year == 2023
@@ -44,4 +44,4 @@ def test_id_str_with_seconds():
     assert identifier.second == 33
     assert identifier.executor == 'blabla_blabla'
     assert identifier.name == 'test'
-    assert identifier.value == '2023_10_11_15_18_33_blabla_blabla test'
+    assert identifier.value == '2023_10_11_15_18_33_blabla_blabla__test'
