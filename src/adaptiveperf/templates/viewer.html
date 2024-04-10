@@ -273,7 +273,25 @@
           });
       });
 
+      function compressResult(result, total, threshold) {
+          var children = result['children'];
+
+          for (var i = children.length - 1; i >= 0; i--) {
+              if (children[i]['value'] < threshold * total) {
+                  children.splice(i, 1);
+              } else {
+                  compressResult(children[i], total, threshold);
+              }
+          }
+      }
+
       function openFlameGraph(result, callchains) {
+          for (var event in result) {
+              for (var i = 0; i < result[event].length; i++) {
+                  compressResult(result[event][i], result[event][i]['value'], {{ flame_graph_threshold }});
+              }
+          }
+
           callchain_obj = callchains;
           flamegraph_obj = flamegraph();
           flamegraph_obj.color(function(node, original_color) {
@@ -532,7 +550,7 @@
         <div id="flamegraph_header">
           <h2 id="flamegraph_title">Test</h2>
           <p style="text-align: center; color:red" id="sampled_time_warning"><b>WARNING:</b> The difference between the exact and sampled runtime is <span id="sampled_diff"></span>%, which exceeds {{ '{:.2f}'.format(tolerance * 100) }}%! For accurate results, you may need to increase the on-CPU and/or off-CPU sampling frequency (depending on whether the process/thread runs mostly on- or off-CPU).</p>
-          <p style="font-style:italic; text-align:center">Click anywhere outside of the window to close it.</p>
+          <p style="font-style:italic; text-align:center">Blocks taking less than {{ '{:.2f}'.format(flame_graph_threshold * 100) }}% of total samples are not shown to speed up rendering. Click anywhere outside of the window to exit.</p>
         </div>
         <div id="flamegraph_choice">
           <div id="metric_choice">

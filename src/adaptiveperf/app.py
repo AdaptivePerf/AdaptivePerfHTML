@@ -55,4 +55,6 @@ def main():
                            local=False,
                            tolerance=app.config.get('TOLERANCE', 0.5),
                            offcpu_sampling=app.config.get(
-                               'OFFCPU_SAMPLING', 500))
+                               'OFFCPU_SAMPLING', 500),
+                           flame_graph_threshold=app.config.get(
+                               'FLAME_GRAPH_THRESHOLD', 0.025))
