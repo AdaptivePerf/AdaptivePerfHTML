@@ -5,7 +5,7 @@ A tool for producing the HTML summary of profiling results returned e.g. by Adap
 AdaptivePerfHTML has been redesigned recently and its documentation and build system are not fully updated/reverified yet. This will change soon!
 
 ## Disclaimer
-This is currently a beta version and the tool is under active development. Bugs are to be expected (with the test coverage to be expanded soon). Use at your own risk!
+This is currently a dev version and the tool is under active development. Bugs are to be expected (with the test coverage to be expanded soon). Use at your own risk!
 
 All feedback is welcome.
 
