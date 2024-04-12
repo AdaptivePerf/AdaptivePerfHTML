@@ -2,8 +2,7 @@
 # Copyright (C) CERN. See LICENSE for details.
 
 import re
-import pickle
-import subprocess
+import sys
 import json
 from treelib import Tree
 from pathlib import Path
@@ -138,6 +137,41 @@ class ProfilingResults:
                     match = re.search(r'^(\S+) (.+)$',  line.strip())
                     self._metrics[match.group(1)] = match.group(2)
 
+    def get_flame_graph(self, pid, tid, compress_threshold):
+        p = self._path / 'processed' / f'{pid}_{tid}.json'
+
+        def compress_result(result, total):
+            children = result['children']
+
+            for i in range(len(children) - 1, -1, -1):
+                if children[i]['value'] < compress_threshold * total:
+                    del children[i]
+                else:
+                    compress_result(children[i], total)
+
+        if not p.exists():
+            return None
+
+        with p.open(mode='r') as f:
+            data = json.load(f)
+
+        for k, v in data.items():
+            for result in v:
+                compress_result(result, result['value'])
+
+        return json.dumps(data)
+
+    def get_callchain_mappings(self):
+        paths = (self._path / 'processed').glob('*_callchains.json')
+        result_dict = {}
+
+        for path in paths:
+            with path.open(mode='r') as f:
+                result_dict[re.search(r'^(.+)_callchains\.json$',
+                                      path.name).group(1)] = json.load(f)
+
+        return json.dumps(result_dict)
+
     def get_thread_tree(self) -> Tree:
         if self._thread_tree is not None:
             return self._thread_tree
@@ -201,3 +235,30 @@ class ProfilingResults:
             return json.dumps({})
         else:
             return json.dumps(node_to_dict(tree.get_node(tree.root)))
+
+    def get_perf_maps(self):
+        map_paths = (self._path / 'processed').glob('perf-*.map')
+        result_dict = {}
+
+        for map_path in map_paths:
+            data = []
+            with map_path.open(mode='r') as f:
+                for i, line in enumerate(f, 1):
+                    match = re.search(
+                        r'^([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+(.+)$',
+                        line.strip())
+
+                    if match is None:
+                        print(f'Line {i}, {map_path}: '
+                              'incorrect syntax, ignoring.',
+                              file=sys.stderr)
+
+                    data.append(('0x' + match.group(1),
+                                 hex(int(match.group(1), 16) +
+                                     int(match.group(2), 16) - 1),
+                                 match.group(3)))
+
+            data.sort(key=lambda x: int(x[0], 16))
+            result_dict[map_path.name] = data
+
+        return json.dumps(result_dict)

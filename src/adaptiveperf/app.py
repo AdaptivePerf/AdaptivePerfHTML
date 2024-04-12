@@ -1,8 +1,7 @@
 # AdaptivePerfHTML: Tool for producing HTML summary of AdaptivePerf results
 # Copyright (C) CERN. See LICENSE for details.
 
-import os
-from flask import Flask, render_template, request, send_from_directory
+from flask import Flask, render_template, request
 from . import ProfilingResults, Identifier
 
 
@@ -17,20 +16,6 @@ if 'PROFILING_STORAGE' not in app.config:
                        '(usually "results").')
 
 
-@app.get('/<identifier>/<path:path>')
-def get(identifier, path):
-    try:
-        # Check if identifier is correct by verifying that ValueError
-        # is not raised
-        Identifier(identifier)
-
-        return send_from_directory(os.path.join(
-            app.config['PROFILING_STORAGE'],
-            identifier), path)
-    except ValueError:
-        return '', 404
-
-
 @app.post('/<identifier>/')
 def post(identifier):
     try:
@@ -38,9 +23,30 @@ def post(identifier):
         # is not raised
         Identifier(identifier)
 
-        if 'tree' in request.values:
-            return ProfilingResults(
-                app.config['PROFILING_STORAGE'], identifier).get_json_tree()
+        if 'tree' in request.values or 'perf_map' in request.values or \
+           ('pid' in request.values and 'tid' in request.values and
+            'threshold' in request.values) or \
+           'callchain' in request.values:
+            results = ProfilingResults(app.config['PROFILING_STORAGE'],
+                                       identifier)
+
+            if 'tree' in request.values:
+                return results.get_json_tree()
+            elif 'perf_map' in request.values:
+                return results.get_perf_maps()
+            elif 'pid' in request.values and 'tid' in request.values and \
+                 'threshold' in request.values:
+                json_data = results.get_flame_graph(
+                    request.values['pid'],
+                    request.values['tid'],
+                    float(request.values['threshold']))
+
+                if json_data is None:
+                    return '', 404
+                else:
+                    return json_data
+            elif 'callchain' in request.values:
+                return results.get_callchain_mappings()
         else:
             return '', 400
     except ValueError:
