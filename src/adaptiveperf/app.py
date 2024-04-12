@@ -58,9 +58,5 @@ def main():
     return render_template('viewer.html',
                            ids=ProfilingResults.get_all_ids(
                                app.config['PROFILING_STORAGE']),
-                           local=False,
-                           tolerance=app.config.get('TOLERANCE', 0.5),
                            offcpu_sampling=app.config.get(
-                               'OFFCPU_SAMPLING', 500),
-                           flame_graph_threshold=app.config.get(
-                               'FLAME_GRAPH_THRESHOLD', 0.025))
+                               'OFFCPU_SAMPLING', 500))
