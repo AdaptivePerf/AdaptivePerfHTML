@@ -1,4 +1,6 @@
 # AdaptivePerfHTML
+[![Version: 0.1.dev](https://img.shields.io/badge/version-0.1.dev-red)]()
+
 A tool for producing the HTML summary of profiling results returned e.g. by AdaptivePerf.
 
 ## Recent redesign
