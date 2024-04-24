@@ -199,7 +199,8 @@ class ProfilingResults:
                 runtime = to_ms(runtime)
 
             offcpu_regions = list(
-                map(lambda x: (to_ms(x[0] - self._metadata['start_time']),
+                map(lambda x: (to_ms(x[0] -
+                                     self._metadata.get('start_time', 0)),
                                to_ms(x[1])),
                     self._metadata['offcpu_regions'].get(pid_tid_code, [])))
 
