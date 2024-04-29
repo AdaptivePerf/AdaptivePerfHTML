@@ -1,4 +1,5 @@
 # AdaptivePerfHTML
+[![License: GNU GPL v3](https://img.shields.io/badge/license-GNU%20GPL%20v3-blue)]()
 [![Version: 0.1.dev](https://img.shields.io/badge/version-0.1.dev-red)]()
 
 A tool for producing the HTML summary of profiling results returned e.g. by AdaptivePerf.
