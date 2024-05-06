@@ -412,7 +412,7 @@
       }
 
       function onMetricChange(event) {
-          if (flamegraph_obj !== undefined) {
+          if ($('#flamegraph_background').is(':visible') || flamegraph_obj !== undefined) {
               var metric = event.currentTarget.value;
 
               flamegraph_obj = undefined;
