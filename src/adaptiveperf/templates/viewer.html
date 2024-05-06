@@ -253,6 +253,7 @@
                                   if (!('walltime' in result_obj)) {
                                       flamegraph_obj = undefined;
                                       $('#svg').hide();
+                                      $('#search').val('');
                                       $('#no_flamegraph').show();
                                       $('#flamegraph_background').show();
                                   } else {
@@ -276,6 +277,7 @@
                                       if (!('walltime' in result_obj)) {
                                           flamegraph_obj = undefined;
                                           $('#svg').hide();
+                                          $('#search').val('');
                                           $('#no_flamegraph').show();
                                           $('#flamegraph_background').show();
                                       } else {
@@ -286,6 +288,7 @@
                                   }).fail(ajax_obj => {
                                       flamegraph_obj = undefined;
                                       $('#svg').hide();
+                                      $('#search').val('');
                                       $('#no_flamegraph').show();
                                       $('#flamegraph_background').show();
                                       $('#please_wait_background').hide();
@@ -394,6 +397,7 @@
 
           $('#no_flamegraph').hide();
           $('#svg').html('');
+          $('#search').val('');
           $('#svg').show();
           $('#flamegraph_background').show();
           flamegraph_obj.width($('#flamegraph_block').width());
@@ -421,6 +425,7 @@
               if (metric in result_obj) {
                   openFlameGraph(metric);
               } else {
+                  $('#search').val('');
                   $('#svg').hide();
                   $('#no_flamegraph').show();
               }
