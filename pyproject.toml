@@ -8,7 +8,7 @@ dynamic = ["version"]
 authors = [
   { name="Maksymilian Graczyk", email="maksymilian.graczyk@cern.ch" },
 ]
-description = "HTML summary producer for profiling results returned by AdaptivePerf"
+description = "HTML summary producer for profiling results returned e.g. by AdaptivePerf"
 requires-python = ">=3.6"
 dependencies = [
   "Jinja2",
