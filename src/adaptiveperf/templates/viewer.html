@@ -377,7 +377,15 @@
           flamegraph_obj = flamegraph();
           flamegraph_obj.sort($('#time_ordered').prop('checked') ? false : true);
           flamegraph_obj.color(function(node, original_color) {
-              return node.highlight || !node.data.cold ? original_color : '#039dfc';
+              if (node.highlight) {
+                  return original_color;
+              } else if (node.data.cold) {
+                  return '#039dfc';
+              } else if (node.data.name == "(compressed)") {
+                  return '#cc99ff';
+              } else {
+                  return original_color;
+              }
           });
           flamegraph_obj.getName(function(node) {
               if (node.data.name in callchain_obj[$('#metric').val()]) {

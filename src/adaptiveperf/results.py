@@ -142,15 +142,18 @@ class ProfilingResults:
 
         def compress_result(result, total, time_ordered):
             children = result['children']
+            new_children = []
+            compressed_value = 0
 
             for child in children:
                 if child['value'] < compress_threshold * total:
                     child['compressed'] = True
+
+                    if not time_ordered:
+                        compressed_value += child['value']
                 else:
                     compress_result(child, total, time_ordered)
 
-            new_children = []
-            compressed_value = 0
             for child in children:
                 if time_ordered:
                     if child.get('compressed', False):
@@ -167,6 +170,13 @@ class ProfilingResults:
                         new_children.append(child)
                 elif not child.get('compressed', False):
                     new_children.append(child)
+
+            if compressed_value > 0:
+                new_children.append({
+                    'name': '(compressed)',
+                    'value': compressed_value,
+                    'children': []
+                })
 
             result['children'] = new_children
 
