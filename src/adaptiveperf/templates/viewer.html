@@ -131,8 +131,8 @@
                           var end = start + json.off_cpu[i][1];
                           var offcpu_sampling = {{ offcpu_sampling }};
 
-                          if (start % offcpu_sampling == 0 ||
-                              end % offcpu_sampling == 0 ||
+                          if (start % offcpu_sampling === 0 ||
+                              end % offcpu_sampling === 0 ||
                               Math.floor(start / offcpu_sampling) != Math.floor(end / offcpu_sampling)) {
                               var off_cpu_item = {
                                   id: json.id + '_offcpu' + i,
@@ -363,7 +363,7 @@
               $.ajax(ajaxPostOptions)
                   .done(parseResult)
                   .fail(function(ajax_obj) {
-                      if (ajax_obj.status == 500) {
+                      if (ajax_obj.status === 500) {
                           alert('Could not load the session because of an error on the server side!');
                       } else {
                           alert('Could not load the session! (HTTP code ' + ajax_obj.status + ')');
@@ -381,7 +381,7 @@
                   return original_color;
               } else if (node.data.cold) {
                   return '#039dfc';
-              } else if (node.data.name == "(compressed)") {
+              } else if (node.data.name === "(compressed)") {
                   return '#cc99ff';
               } else {
                   return original_color;
@@ -397,7 +397,7 @@
               }
           });
 
-          if (metric == 'walltime') {
+          if (metric === 'walltime') {
               flamegraph_obj.setColorHue('warm');
           } else {
               flamegraph_obj.setColorHue('green');
