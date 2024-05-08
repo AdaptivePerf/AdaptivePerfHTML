@@ -140,14 +140,35 @@ class ProfilingResults:
     def get_flame_graph(self, pid, tid, compress_threshold):
         p = self._path / 'processed' / f'{pid}_{tid}.json'
 
-        def compress_result(result, total):
+        def compress_result(result, total, time_ordered):
             children = result['children']
 
-            for i in range(len(children) - 1, -1, -1):
-                if children[i]['value'] < compress_threshold * total:
-                    del children[i]
+            for child in children:
+                if child['value'] < compress_threshold * total:
+                    child['compressed'] = True
                 else:
-                    compress_result(children[i], total)
+                    compress_result(child, total, time_ordered)
+
+            new_children = []
+            compressed_value = 0
+            for child in children:
+                if time_ordered:
+                    if child.get('compressed', False):
+                        compressed_value += child['value']
+                    else:
+                        if compressed_value > 0:
+                            new_children.append({
+                                'name': '(compressed)',
+                                'value': compressed_value,
+                                'children': []
+                            })
+                            compressed_value = 0
+
+                        new_children.append(child)
+                elif not child.get('compressed', False):
+                    new_children.append(child)
+
+            result['children'] = new_children
 
         if not p.exists():
             return None
@@ -156,8 +177,12 @@ class ProfilingResults:
             data = json.load(f)
 
         for k, v in data.items():
-            for result in v:
-                compress_result(result, result['value'])
+            if len(v) != 2:
+                raise RuntimeError(f'{k} in {pid}_{tid}.json should have '
+                                   f'exactly 2 elements, but it has {len(v)}')
+
+            compress_result(v[0], v[0]['value'], False)
+            compress_result(v[1], v[1]['value'], True)
 
         return json.dumps(data)
 
