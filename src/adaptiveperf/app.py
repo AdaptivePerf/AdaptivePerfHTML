@@ -20,8 +20,8 @@ if 'PROFILING_STORAGE' not in app.config:
 def post(identifier):
     """
     Process a POST request relevant to a profiling session with
-    a given identifier. The request should have one of the following
-    arguments:
+    an identifier given in the URL. The request should have one of the
+    following arguments:
     * "tree" (with any value):
       This instructs AdaptivePerfHTML to return the thread/process
       tree obtained in the session.
@@ -80,6 +80,11 @@ def post(identifier):
 
 @app.route('/')
 def main():
+    # offcpu_sampling describes the sampling *period* (not
+    # frequency) in ms for off-CPU regions to be displayed on the
+    # timeline (as rendering a large number of these regions
+    # can be resource-heavy). It works in a similar way to
+    # sampling in off-CPU profiling in AdaptivePerf.
     return render_template('viewer.html',
                            ids=ProfilingResults.get_all_ids(
                                app.config['PROFILING_STORAGE']),
