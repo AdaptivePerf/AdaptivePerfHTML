@@ -18,6 +18,31 @@ if 'PROFILING_STORAGE' not in app.config:
 
 @app.post('/<identifier>/')
 def post(identifier):
+    """
+    Process a POST request relevant to a profiling session with
+    a given identifier. The request should have one of the following
+    arguments:
+    * "tree" (with any value):
+      This instructs AdaptivePerfHTML to return the thread/process
+      tree obtained in the session.
+    * "perf_map" (with any value):
+      This instructs AdaptivePerfHTML to return perf symbol maps
+      obtained in the session.
+    * "pid" (with a numeric value) and "tid" (with a numeric value)
+      and "threshold" (with a decimal value):
+      This instructs AdaptivePerfHTML to return a flame graph of
+      the thread/process with a given PID and TID to be rendered by
+      d3-flame-graph, taking into account not to render blocks taking
+      less than a specified share of total samples (e.g. if "threshold" is
+      set to 0.10, blocks taking less than 10% of total samples
+      will not be effectively rendered).
+    * "callchain" (with any value):
+      This instructs AdaptivePerfHTML to return the session dictionaries
+      mapping compressed symbol names to full symbol names.
+
+    :param str identifier: A profiling session identifier in the form
+                           described in the Identifier class docstring.
+    """
     try:
         # Check if identifier is correct by verifying that ValueError
         # is not raised
