@@ -9,7 +9,30 @@ from pathlib import Path
 
 
 class Identifier:
+    """
+    A class representing a profiling session identifier.
+
+    The identifier takes form of
+    "<year>_<month>_<day>_<hour>_<minute>_<executor>__<profiled filename>"
+    or "<year>_<month>_<day>_<hour>_<minute>_<second>_<executor>__
+    <profiled filename>". <executor> is the machine hostname / development
+    branch where an executable named <profiled filename> was profiled.
+
+    All folders in the profiling results directory correspond to profiling
+    sessions and have the name matching one of the patterns above.
+
+    Given this description, the properties of this class should be
+    self-explanatory.
+    """
+
     def __init__(self, id_str: str):
+        """
+        Construct an Identifier object, checking the correctness
+        of the supplied identifier string.
+
+        :param str id_str: A profiling session identifier string.
+        :raises ValueError: When a provided identifier is incorrect.
+        """
         self._id_str = id_str
 
         match = re.search(r'^(\d+)_(\d+)_(\d+)_(\d+)_(\d+)_(.+)$',
@@ -40,6 +63,12 @@ class Identifier:
         self._name = match.group(2)
 
     def __str__(self):
+        """
+        Return a user-friendly string representation of the identifier in
+        form of "[<executor>] <profiled filename> (<year>-<month>-<day> <hour>:
+        <minute>:<second>)" (or without ":<second>" if the seconds part
+        of the time was not provided during the object construction).
+        """
         if self._second is None:
             return f'[{self._executor}] {self._name} ' \
                 f'({self._year}-{self._month}-{self._day} ' \
@@ -96,7 +125,21 @@ class Identifier:
 
 
 class ProfilingResults:
+    """
+    A class describing the results of a specific profiling session
+    stored inside a given profiling results directory.
+    """
+
     def get_all_ids(path_str: str) -> list:
+        """
+        Get the identifiers of all profiling sessions stored in
+        a given profiling results directory.
+
+        :param str path_str: The path string to a profiling
+                             results directory.
+        :return: The list of identifiers that can be used
+                 for constructing a ProfilingResults object.
+        """
         id_str_list = []
         path = Path(path_str)
 
@@ -121,6 +164,16 @@ class ProfilingResults:
                         sorted(id_str_list, key=lambda x: x[1])))
 
     def __init__(self, profiling_storage: str, identifier: str):
+        """
+        Construct a ProfilingResults object.
+
+        :param str profiling_storage: The path string to a profiling
+                                      results directory.
+        :param str identifier: The identifier of a profiling session
+                               stored inside the results directory.
+                               Call get_all_ids() for the list of all
+                               valid identifiers.
+        """
         self._path = Path(profiling_storage) / identifier
         self._thread_tree = None
 
@@ -138,6 +191,19 @@ class ProfilingResults:
                     self._metrics[match.group(1)] = match.group(2)
 
     def get_flame_graph(self, pid, tid, compress_threshold):
+        """
+        Get a flame graph of the thread/process with a given PID and TID
+        to be rendered by d3-flame-graph, taking into account not to render
+        blocks taking less than a specified share of total samples.
+
+        :param int pid: The PID of a thread/process in the session.
+        :param int tid: The TID of a thread/process in the session.
+        :param float compress_threshold: A compression threshold. For
+                                         example, if its value is 0.10,
+                                         blocks taking less than 10% of
+                                         total samples will not be
+                                         effectively rendered.
+        """
         p = self._path / 'processed' / f'{pid}_{tid}.json'
 
         def compress_result(result, total, time_ordered):
@@ -197,6 +263,14 @@ class ProfilingResults:
         return json.dumps(data)
 
     def get_callchain_mappings(self):
+        """
+        Get a JSON object string representing dictionaries mapping compressed
+        callchain symbol names to full symbol names.
+
+        Inside the object, the dictionaries are grouped by event types, e.g.
+        "syscalls" has the mappings between compressed callchain symbol names
+        captured during tree profiling and full symbol names.
+        """
         paths = (self._path / 'processed').glob('*_callchains.json')
         result_dict = {}
 
@@ -208,6 +282,10 @@ class ProfilingResults:
         return json.dumps(result_dict)
 
     def get_thread_tree(self) -> Tree:
+        """
+        Get a treelib.Tree object representing the thread/process tree of
+        the session.
+        """
         if self._thread_tree is not None:
             return self._thread_tree
 
@@ -220,6 +298,34 @@ class ProfilingResults:
         return tree
 
     def get_json_tree(self):
+        """
+        Get a JSON object string representing the thread/process tree of
+        the session.
+
+        The returned object is the root, which describes the very first
+        process detected in the session along with its children.
+        The object has the following keys:
+        * "id": the unique identifier of a thread/process in form of
+          "<PID>_<TID>".
+        * "start_time": the timestamp of the moment when the thread/process
+           was effectively started, in milliseconds.
+        * "runtime": the number of milliseconds the thread/process was
+          running for.
+        * "sampled_time": the number of milliseconds the thread/process
+          was running for, as sampled by "perf".
+        * "name": the process name.
+        * "pid_tid": the PID and TID pair string in form of "<PID>/<TID>".
+        * "off_cpu": the list of intervals when the thread/process was
+          off-CPU. Each interval is in form of (a, b), where a is the
+          start time of an off-CPU interval and b is the length of such
+          interval.
+        * "start_callchain": the callchain spawning the thread/process.
+        * "metrics": the JSON object mapping extra profiling metrics (in
+          addition to on-CPU/off-CPU activity) to their website titles (e.g.
+          "page-faults" -> "Page faults"). It can be empty.
+        * "children": the list of all threads/processes spawned by the
+          thread/process. Each element has the same structure as the root.
+        """
         def to_ms(num):
             return None if num is None else num / 1000000
 
@@ -273,6 +379,13 @@ class ProfilingResults:
             return json.dumps(node_to_dict(tree.get_node(tree.root)))
 
     def get_perf_maps(self):
+        """
+        Get a JSON object string representing perf symbol maps
+        obtained in the session.
+
+        Inside the object, symbol maps can be accessed through
+        their original filenames, e.g. perf-1784.map.
+        """
         map_paths = (self._path / 'processed').glob('perf-*.map')
         result_dict = {}
 

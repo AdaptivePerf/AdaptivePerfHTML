@@ -91,9 +91,11 @@
                           style: 'background-color:#aa0000; z-index:-1'
                       };
 
-                      var sampled_diff = (1.0 * Math.abs(json.runtime - json.sampled_time)) / json.runtime;
+                      var sampled_diff = (1.0 * Math.abs(
+                          json.runtime - json.sampled_time)) / json.runtime;
                       sampled_diff_dict[item.id] = sampled_diff;
-                      var warning = sampled_diff > 1.0 * $('#runtime_diff_threshold_input').val() / 100;
+                      var warning =
+                          sampled_diff > 1.0 * $('#runtime_diff_threshold_input').val() / 100;
 
                       var group = {
                           id: json.id,
@@ -117,8 +119,14 @@
 
                       var numf = new Intl.NumberFormat('en-US');
 
-                      item_dict[item.id] = json.name + ' (' + json.pid_tid + '): ' + numf.format(json.runtime) + ' ms <span id="sampled_runtime">(sampled: ~' + numf.format(json.sampled_time) + ' ms)</span>';
-                      tooltip_dict[item.id] = 'Runtime: ' + numf.format(json.runtime) + ' ms <span id="tooltip_sampled_runtime">(sampled: ~' + numf.format(json.sampled_time) + ' ms)</span>';
+                      item_dict[item.id] = json.name + ' (' + json.pid_tid +
+                          '): ' + numf.format(json.runtime) +
+                          ' ms <span id="sampled_runtime">(sampled: ~' +
+                          numf.format(json.sampled_time) + ' ms)</span>';
+                      tooltip_dict[item.id] = 'Runtime: ' +
+                          numf.format(json.runtime) +
+                          ' ms <span id="tooltip_sampled_runtime">(sampled: ~' +
+                          numf.format(json.sampled_time) + ' ms)</span>';
                       metrics_dict[item.id] = json.metrics;
                       warning_dict[item.id] = [warning, sampled_diff];
 
@@ -133,7 +141,8 @@
 
                           if (start % offcpu_sampling === 0 ||
                               end % offcpu_sampling === 0 ||
-                              Math.floor(start / offcpu_sampling) != Math.floor(end / offcpu_sampling)) {
+                              Math.floor(start / offcpu_sampling) != Math.floor(
+                                  end / offcpu_sampling)) {
                               var off_cpu_item = {
                                   id: json.id + '_offcpu' + i,
                                   group: json.id,
@@ -223,18 +232,22 @@
                               $('#please_wait_background').show();
                               $('#flamegraph_title').html(item_dict[props.group]);
 
-                              if (sampled_diff_dict[props.group] > 1.0 * $('#runtime_diff_threshold_input').val() / 100) {
+                              if (sampled_diff_dict[props.group] >
+                                  1.0 * $('#runtime_diff_threshold_input').val() / 100) {
                                   $('#sampled_time_warning').show();
                                   $('#sampled_runtime').css('color', 'red');
-                                  $('#sampled_diff').html((sampled_diff_dict[props.group] * 100).toFixed(2));
-                                  $('#runtime_diff_threshold').html($('#runtime_diff_threshold_input').val());
+                                  $('#sampled_diff').html(
+                                      (sampled_diff_dict[props.group] * 100).toFixed(2));
+                                  $('#runtime_diff_threshold').html(
+                                      $('#runtime_diff_threshold_input').val());
                               } else {
                                   $('#sampled_runtime').css('color', 'black');
                                   $('#sampled_time_warning').hide();
                               }
 
                               $('#metric').empty();
-                              $('#metric').append(new Option('Wall time (ns)', 'walltime'));
+                              $('#metric').append(new Option('Wall time (ns)',
+                                                             'walltime'));
 
                               // Based on https://stackoverflow.com/a/2553045
                               $.each(metrics_dict[props.group], function (val, text) {
@@ -245,10 +258,14 @@
                               $('#time_ordered').prop('checked', false);
                               $('#flamegraph').attr('data-id', props.group);
 
-                              $('#flame_graph_threshold').html($('#threshold_input').val());
+                              $('#flame_graph_threshold').html(
+                                  $('#threshold_input').val());
 
-                              if (props.group + '_' + $('#threshold_input').val() in result_cache) {
-                                  result_obj = result_cache[props.group + '_' + $('#threshold_input').val()];
+                              if (props.group + '_' +
+                                  $('#threshold_input').val() in result_cache) {
+                                  result_obj = result_cache[
+                                      props.group + '_' + $(
+                                          '#threshold_input').val()];
 
                                   if (!('walltime' in result_obj)) {
                                       flamegraph_obj = undefined;
@@ -269,9 +286,12 @@
                                       method: 'POST',
                                       dataType: 'json',
                                       data: {pid: pid_tid[0], tid: pid_tid[1],
-                                             threshold: 1.0 * $('#threshold_input').val() / 100}
+                                             threshold: 1.0 * $(
+                                                 '#threshold_input').val() / 100}
                                   }).done(ajax_obj => {
-                                      result_cache[props.group + '_' + $('#threshold_input').val()] = ajax_obj;
+                                      result_cache[
+                                          props.group + '_' + $(
+                                              '#threshold_input').val()] = ajax_obj;
                                       result_obj = ajax_obj;
 
                                       if (!('walltime' in result_obj)) {
@@ -300,24 +320,31 @@
                       timeline.on('contextmenu', function (props) {
                           if (props.group != null && props.group in callchain_dict) {
                               $('#callchain').text(callchain_dict[props.group].map(elem => {
-                                  if (callchain_obj !== undefined && elem in callchain_obj['syscall']) {
+                                  if (callchain_obj !== undefined &&
+                                      elem in callchain_obj['syscall']) {
                                       return callchain_obj['syscall'][elem];
                                   } else if (/^\(0x[0-9a-f]+;.+\)$/.test(elem)) {
                                       return getSymbolFromMap(elem);
-                                  } else if (/^\[.+\]$/.test(elem) || /^\(0x[0-9a-f]+\)$/.test(elem)) {
+                                  } else if (/^\[.+\]$/.test(elem) ||
+                                             /^\(0x[0-9a-f]+\)$/.test(elem)) {
                                       return elem;
                                   } else {
-                                      return elem + ' (not-yet-loaded or missing callchain dictionary)';
+                                      return elem +
+                                          ' (not-yet-loaded or missing ' +
+                                          'callchain dictionary)';
                                   }
                               }).join('\n'));
-                              $('#callchain').html($('#callchain').html().replace(/\n/g, '<br />'));
-                              $('#callchain_block_title').html(tooltip_dict[props.group]);
+                              $('#callchain').html(
+                                  $('#callchain').html().replace(/\n/g, '<br />'));
+                              $('#callchain_block_title').html(
+                                  tooltip_dict[props.group]);
                               $('#callchain_block').css('top', props.pageY);
                               $('#callchain_block').css('left', props.pageX);
                               $('#callchain_block').outerHeight('auto');
                               $('#callchain_block').css('display', 'flex');
 
-                              if (sampled_diff_dict[props.group] > 1.0 * $('#runtime_diff_threshold_input').val() / 100) {
+                              if (sampled_diff_dict[props.group] >
+                                  1.0 * $('#runtime_diff_threshold_input').val() / 100) {
                                   $('#tooltip_sampled_runtime').css('color', 'red');
                               } else {
                                   $('#tooltip_sampled_runtime').css('color', 'black');
@@ -327,11 +354,13 @@
                               var width = $('#callchain_block').outerWidth();
 
                               if (props.pageY + height > $(window).outerHeight() - 30) {
-                                  $('#callchain_block').outerHeight($(window).outerHeight() - props.pageY - 30);
+                                  $('#callchain_block').outerHeight(
+                                      $(window).outerHeight() - props.pageY - 30);
                               }
 
                               if (props.pageX + width > $(window).outerWidth() - 20) {
-                                  $('#callchain_block').css('left', props.pageX - width);
+                                  $('#callchain_block').css(
+                                      'left', props.pageX - width);
                               }
 
                               props.event.preventDefault();
@@ -364,9 +393,11 @@
                   .done(parseResult)
                   .fail(function(ajax_obj) {
                       if (ajax_obj.status === 500) {
-                          alert('Could not load the session because of an error on the server side!');
+                          alert('Could not load the session because of an ' +
+                                'error on the server side!');
                       } else {
-                          alert('Could not load the session! (HTTP code ' + ajax_obj.status + ')');
+                          alert('Could not load the session! (HTTP code ' +
+                                ajax_obj.status + ')');
                       }
                       $('#please_wait_background').hide();
                   });
@@ -409,7 +440,10 @@
           $('#svg').show();
           $('#flamegraph_background').show();
           flamegraph_obj.width($('#flamegraph_block').width());
-          d3.select('#svg').datum(result_obj[metric][$('#time_ordered').prop('checked') ? 1 : 0]).call(flamegraph_obj);
+          d3.select('#svg').datum(
+              result_obj[metric][
+                  $('#time_ordered').prop('checked') ? 1 : 0]).call(
+                      flamegraph_obj);
           var svg = document.getElementById('flamegraph');
           svg.scrollTop = svg.scrollHeight;
       }
@@ -424,7 +458,8 @@
       }
 
       function onMetricChange(event) {
-          if ($('#flamegraph_background').is(':visible') || flamegraph_obj !== undefined) {
+          if ($('#flamegraph_background').is(':visible') ||
+              flamegraph_obj !== undefined) {
               var metric = event.currentTarget.value;
 
               flamegraph_obj = undefined;
@@ -443,7 +478,8 @@
       function onTimeOrderedChange(event) {
           if (flamegraph_obj !== undefined) {
               flamegraph_obj.sort(!event.currentTarget.checked);
-              flamegraph_obj.update(result_obj[$('#metric').val()][event.currentTarget.checked ? 1 : 0]);
+              flamegraph_obj.update(result_obj[$('#metric').val()][
+                  event.currentTarget.checked ? 1 : 0]);
           }
       }
 
@@ -474,7 +510,8 @@
       }
 
       $(document).ready(function() {
-          new ResizeObserver(onFlameGraphBlockResize).observe(document.getElementById('flamegraph_block'));
+          new ResizeObserver(onFlameGraphBlockResize).observe(
+              document.getElementById('flamegraph_block'));
       });
     </script>
     <style type="text/css">
@@ -584,8 +621,16 @@
       }
 
       #callchain {
-          /* Based on https://meta.stackexchange.com/a/36177 */
-          font-family:Consolas,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New;
+          /* Based on https://meta.stackexchange.com/q/364048 */
+          font-family:ui-monospace,
+                      Cascadia Mono,
+                      Segoe UI Mono,
+                      Ubuntu Mono,
+                      Roboto Mono,
+                      Menlo,
+                      Monaco,
+                      Consolas,
+                      monospace;
       }
 
       #flamegraph_title {
@@ -657,15 +702,32 @@
           <h2>You must have JavaScript enabled in order to use this page!</h2>
         </noscript>
         <select name="results" id="results_combobox" autocomplete="off">
-          <option value="" selected="selected" disabled="disabled">Please select a profiling session...</option>
+          <option value="" selected="selected" disabled="disabled">
+            Please select a profiling session...
+          </option>
           {% for x in ids %}
           <option value="{{ x.value }}">{{ x }}</option>
           {% endfor %}
         </select>
         <span id="settings">
-          <p style="font-style:italic">The time axis is in milliseconds (ms). <font color="#aa0000">Red parts</font> are on-CPU and <font color="#0294e3">blue parts</font> are off-CPU. Right-click any thread/process (except the root one) to check its runtime and spawning stack trace. Double-click any thread/process to open flame graphs.</p>
-          <p style="font-style:italic">Do not display flame graph blocks taking less than this % of total samples: <input type="number" value="2.50" step=".1" id="threshold_input" /></p>
-          <p style="font-style:italic">Warn if the difference between exact and sampled runtime exceeds this %: <input type="number" value="50", step="1" id="runtime_diff_threshold_input" /></p>
+          <p style="font-style:italic">
+            The time axis is in milliseconds (ms).
+            <font color="#aa0000">Red parts</font> are on-CPU and
+            <font color="#0294e3">blue parts</font> are off-CPU. Right-click
+            any thread/process (except the root one) to check its runtime and
+            spawning stack trace. Double-click any thread/process to
+            open flame graphs.
+          </p>
+          <p style="font-style:italic">
+            Do not display flame graph blocks taking less than
+            this % of total samples: <input type="number" value="2.50"
+                                            step=".1" id="threshold_input" />
+          </p>
+          <p style="font-style:italic">
+            Warn if the difference between exact and sampled runtime exceeds
+            this %: <input type="number" value="50", step="1"
+                           id="runtime_diff_threshold_input" />
+          </p>
         </span>
       </div>
       <div id="block" class="scrollable">
@@ -678,11 +740,24 @@
       <span id="callchain"></span>
     </div>
     <div id="flamegraph_background" onclick="onBackgroundClick()">
-      <div id="flamegraph_block" onclick="onBlockClick(event)" onmousedown="onFlameGraphBlockMouseDown()" onmouseup="onFlameGraphBlockMouseUp()">
+      <div id="flamegraph_block" onclick="onBlockClick(event)"
+           onmousedown="onFlameGraphBlockMouseDown()"
+           onmouseup="onFlameGraphBlockMouseUp()">
         <div id="flamegraph_header">
           <h2 id="flamegraph_title">Test</h2>
-          <p style="text-align: center; color:red" id="sampled_time_warning"><b>WARNING:</b> The difference between the exact and sampled runtime is <span id="sampled_diff"></span>%, which exceeds <span id="runtime_diff_threshold">50</span>%! For accurate results, you may need to increase the on-CPU and/or off-CPU sampling frequency (depending on whether the process/thread runs mostly on- or off-CPU).</p>
-          <p style="font-style:italic; text-align:center">Blocks taking less than <span id="flame_graph_threshold">2.50</span>% of total samples are not shown to speed up rendering. Click anywhere outside of the window to exit.</p>
+          <p style="text-align: center; color:red" id="sampled_time_warning">
+            <b>WARNING:</b> The difference between the exact and sampled
+            runtime is <span id="sampled_diff"></span>%, which exceeds
+            <span id="runtime_diff_threshold">50</span>%! For accurate results,
+            you may need to increase the on-CPU and/or off-CPU sampling
+            frequency (depending on whether the process/thread runs mostly
+            on- or off-CPU).
+          </p>
+          <p style="font-style:italic; text-align:center">
+            Blocks taking less than <span id="flame_graph_threshold">2.50</span>%
+            of total samples are not shown to speed up rendering.
+            Click anywhere outside of the window to exit.
+          </p>
         </div>
         <div id="flamegraph_choice">
           <div id="metric_choice">
@@ -690,13 +765,22 @@
             <select name="metric" id="metric" onchange="onMetricChange(event)">
 
             </select>
-            <input type="checkbox" id="time_ordered" name="time_ordered" onchange="onTimeOrderedChange(event)">
+            <input type="checkbox" id="time_ordered"
+                   name="time_ordered" onchange="onTimeOrderedChange(event)">
             <label for="time_ordered">Time-ordered</label>
           </div>
-          <input type="text" id="search" name="search_query" oninput="onSearchQueryChange(this.value)" placeholder="Search..." />
+          <input type="text" id="search" name="search_query"
+                 oninput="onSearchQueryChange(this.value)"
+                 placeholder="Search..." />
         </div>
         <div id="flamegraph" class="scrollable">
-          <p id="no_flamegraph">There is no flame graph associated with the selected process/thread, metric, and time order (or the flame graph could not be loaded)! This may be caused by the inability of capturing a specific event for that process/thread (it is a disadvantage of sampling-based profiling).</p>
+          <p id="no_flamegraph">
+            There is no flame graph associated with the selected process/thread,
+            metric, and time order (or the flame graph could not be loaded)!
+            This may be caused by the inability of capturing a specific event
+            for that process/thread (it is a disadvantage of sampling-based
+            profiling).
+          </p>
           <div id="svg"></div>
         </div>
       </div>
