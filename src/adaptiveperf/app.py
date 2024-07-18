@@ -41,10 +41,10 @@ def post(identifier):
       and "threshold" (with a decimal value):
       This instructs AdaptivePerfHTML to return a flame graph of
       the thread/process with a given PID and TID to be rendered by
-      d3-flame-graph, taking into account not to render blocks taking
-      less than a specified share of total samples (e.g. if "threshold" is
-      set to 0.10, blocks taking less than 10% of total samples
-      will not be effectively rendered).
+      d3-flame-graph, taking into account to collapse blocks taking
+      less than a specified share of samples (e.g. if "threshold" is
+      set to 0.10, blocks taking less than 10% of samples
+      will be collapsed, with an option to expand them at runtime).
     * "callchain" (with any value):
       This instructs AdaptivePerfHTML to return the session dictionaries
       mapping compressed symbol names to full symbol names.

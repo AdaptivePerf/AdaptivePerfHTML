@@ -199,7 +199,7 @@
                                         callchain_dict, tooltip_dict,
                                         warning_dict);
 
-                      var container = document.getElementById('block');
+                      var container = $('#block')[0];
                       container.innerHTML = '';
 
                       var timeline = new vis.Timeline(
@@ -227,7 +227,7 @@
                       timeline.on('doubleClick', function (props) {
                           if (props.group != null) {
                               $('#please_wait_background').show();
-                              $('#flamegraph_title').html(item_dict[props.group]);
+                              $('#result_title').html(item_dict[props.group]);
 
                               if (sampled_diff_dict[props.group] >
                                   1.0 * $('#runtime_diff_threshold_input').val() / 100) {
@@ -255,9 +255,6 @@
                               $('#time_ordered').prop('checked', false);
                               $('#flamegraph').attr('data-id', props.group);
 
-                              $('#flame_graph_threshold').html(
-                                  $('#threshold_input').val());
-
                               if (props.group + '_' +
                                   $('#threshold_input').val() in result_cache) {
                                   result_obj = result_cache[
@@ -269,7 +266,7 @@
                                       $('#svg').hide();
                                       $('#search').val('');
                                       $('#no_flamegraph').show();
-                                      $('#flamegraph_background').show();
+                                      $('#result_background').show();
                                   } else {
                                       openFlameGraph('walltime');
                                   }
@@ -296,7 +293,7 @@
                                           $('#svg').hide();
                                           $('#search').val('');
                                           $('#no_flamegraph').show();
-                                          $('#flamegraph_background').show();
+                                          $('#result_background').show();
                                       } else {
                                           openFlameGraph('walltime');
                                       }
@@ -307,7 +304,7 @@
                                       $('#svg').hide();
                                       $('#search').val('');
                                       $('#no_flamegraph').show();
-                                      $('#flamegraph_background').show();
+                                      $('#result_background').show();
                                       $('#please_wait_background').hide();
                                   });
                               }
@@ -401,8 +398,25 @@
           });
       });
 
+      function updateFlameGraph(data, always_change_height) {
+          if (flamegraph_obj !== undefined) {
+              if (data !== null) {
+                  flamegraph_obj.update(data);
+              }
+
+              var flamegraph_svg = $('#svg').children()[0];
+              var target_height = flamegraph_svg.getBBox().height;
+
+              if (always_change_height || target_height > $('#svg').height()) {
+                  $('#svg').height(target_height);
+                  flamegraph_svg.setAttribute('height', target_height);
+              }
+          }
+      }
+
       function openFlameGraph(metric) {
           flamegraph_obj = flamegraph();
+          flamegraph_obj.inverted(true);
           flamegraph_obj.sort($('#time_ordered').prop('checked') ? false : true);
           flamegraph_obj.color(function(node, original_color) {
               if (node.highlight) {
@@ -424,6 +438,26 @@
                   return node.data.name;
               }
           });
+          flamegraph_obj.onClick(function(node) {
+              if ("hidden_children" in node.data) {
+                  var parent = node.parent.data;
+                  var new_children = [];
+
+                  for (var i = 0; i < parent.children.length; i++) {
+                      if ("compressed_id" in parent.children[i] &&
+                          parent.children[i].compressed_id === node.data.compressed_id) {
+                          for (var j = 0; j < node.data.hidden_children.length; j++) {
+                              new_children.push(node.data.hidden_children[j]);
+                          }
+                      } else {
+                          new_children.push(parent.children[i]);
+                      }
+                  }
+
+                  parent.children = new_children;
+                  updateFlameGraph(d3.select('#svg').datum().data, false);
+              }
+          });
 
           if (metric === 'walltime') {
               flamegraph_obj.setColorHue('warm');
@@ -435,18 +469,19 @@
           $('#svg').html('');
           $('#search').val('');
           $('#svg').show();
-          $('#flamegraph_background').show();
-          flamegraph_obj.width($('#flamegraph_block').width());
-          d3.select('#svg').datum(
+          $('#result_background').show();
+          flamegraph_obj.width($('#result_block').width());
+          d3.select('#svg').datum(structuredClone(
               result_obj[metric][
-                  $('#time_ordered').prop('checked') ? 1 : 0]).call(
+                  $('#time_ordered').prop('checked') ? 1 : 0])).call(
                       flamegraph_obj);
-          var svg = document.getElementById('flamegraph');
-          svg.scrollTop = svg.scrollHeight;
+          updateFlameGraph(null, true);
+          $('#flamegraph')[0].scrollTop = 0;
       }
 
       function onBackgroundClick() {
-          $('#flamegraph_background').hide();
+          $('#svg').html('');
+          $('#result_background').hide();
           $('#callchain_block').hide();
       }
 
@@ -455,7 +490,7 @@
       }
 
       function onMetricChange(event) {
-          if ($('#flamegraph_background').is(':visible') ||
+          if ($('#result_background').is(':visible') ||
               flamegraph_obj !== undefined) {
               var metric = event.currentTarget.value;
 
@@ -475,8 +510,9 @@
       function onTimeOrderedChange(event) {
           if (flamegraph_obj !== undefined) {
               flamegraph_obj.sort(!event.currentTarget.checked);
-              flamegraph_obj.update(result_obj[$('#metric').val()][
-                  event.currentTarget.checked ? 1 : 0]);
+              updateFlameGraph(structuredClone(
+                  result_obj[$('#metric').val()][
+                      event.currentTarget.checked ? 1 : 0]), true);
           }
       }
 
@@ -506,9 +542,63 @@
           }
       }
 
+      // downloadFlameGraph() is based on https://stackoverflow.com/a/28226736
+      // (originally CC BY-SA 4.0, covered by GNU GPL v3 here)
+      function downloadFlameGraph() {
+          var filename = window.prompt(
+              'What filename do you want? ' +
+                  '(".png" will be added automatically)');
+
+          if (filename === null || filename === "") {
+              return;
+          }
+
+          $('#please_wait_background').show();
+
+          var svg = $('#svg').children()[0].cloneNode(true);
+          var style = document.createElement('style');
+
+          style.innerHTML = '{{ d3_flamegraph_css }}';
+
+          svg.insertBefore(style, svg.firstChild);
+
+          var url = URL.createObjectURL(new Blob(
+              [(new XMLSerializer()).serializeToString(svg)],
+              { type: 'image/svg+xml;charset=utf-8' }));
+
+          var image = new Image();
+          image.onload = function () {
+              var canvas = document.createElement('canvas');
+              canvas.width = image.width;
+              canvas.height = image.height;
+              canvas.getContext('2d').drawImage(image, 0, 0);
+
+              URL.revokeObjectURL(url);
+
+              var a = document.createElement('a');
+              a.download = filename;
+              a.target = '_blank';
+              a.href = canvas.toDataURL('image/png');
+              a.addEventListener('click', function(event) {
+                  event.stopPropagation();
+              });
+              a.click();
+
+              $('#please_wait_background').hide();
+          };
+          image.onerror = function() {
+              window.alert("Could not download the flame graph because " +
+                           "of an error!");
+              $('#please_wait_background').hide();
+          };
+          image.width = svg.width.baseVal.value;
+          image.height = svg.height.baseVal.value;
+          image.src = url;
+      }
+
       $(document).ready(function() {
           new ResizeObserver(onFlameGraphBlockResize).observe(
-              document.getElementById('flamegraph_block'));
+              $('#result_block')[0]);
       });
     </script>
     <style type="text/css">
@@ -560,7 +650,7 @@
           min-width:50%;
       }
 
-      #flamegraph_background, #please_wait_background {
+      #result_background, #please_wait_background {
           display:none;
           position:fixed;
           top: 0;
@@ -587,19 +677,19 @@
           max-width:50vw;
       }
 
-      #flamegraph_block {
+      #result_block {
           position:fixed;
           max-height:90vh;
           resize:horizontal;
-          overflow:auto;
+          overflow:hidden;
           border-radius:10px;
           padding:10px;
           background-color:white;
           top:50%;
           left:50%;
-          transform:translate(-50%, -50%);
           display:flex;
           flex-direction:column;
+          transform:translate(-50%, -50%);
       }
 
       #please_wait_block {
@@ -630,35 +720,71 @@
                       monospace;
       }
 
-      #flamegraph_title {
+      #result_title {
           width:100%;
           text-align:center;
           margin:10px;
       }
 
-      #flamegraph_choice {
+      #analysis_choice {
           width:100%;
-          margin-top:10px;
+          text-align:center;
+          border-bottom-width:1px;
+          border-bottom-color:grey;
+          border-bottom-style:solid;
+          padding-bottom:20px;
+      }
+
+      #analysis {
+          min-width:250px;
+      }
+
+      #flamegraph_box {
+          width:100%;
+          overflow:hidden;
+          display:flex;
+          flex-direction:column;
+          flex-grow:1;
+      }
+
+      #flamegraph_choice {
+          display:flex;
+          flex-direction:row;
+          width:100%;
           margin-bottom:10px;
       }
 
-      #metric_choice {
-          float:left;
-          margin-left:10px;
-      }
-
-      #search {
-          float:right;
-          margin-right:10px;
-          width:40%;
-      }
-
-      #metric {
-          min-width:250px;
+      #remainder {
+          flex-grow:1;
+          display:flex;
+          align-items:center;
+          margin-right:5px;
       }
 
       #flamegraph {
           flex-grow:1;
+      }
+
+      #metric_choice {
+          margin-left:5px;
+          margin-right:100px;
+          display:flex;
+          align-items:center;
+      }
+
+      #search {
+          flex-grow:1;
+          margin-right:5px;
+      }
+
+      #download {
+          cursor:pointer;
+      }
+
+      #metric {
+          max-width:250px;
+          margin-left:5px;
+          margin-right:5px;
       }
 
       #no_flamegraph {
@@ -717,8 +843,8 @@
           </p>
           <p style="font-style:italic">
             Do not display flame graph blocks taking less than
-            this % of total samples: <input type="number" value="2.50"
-                                            step=".1" id="threshold_input" />
+            this % of samples: <input type="number" value="2.50"
+                                      step=".1" id="threshold_input" />
           </p>
           <p style="font-style:italic">
             Warn if the difference between exact and sampled runtime exceeds
@@ -736,12 +862,12 @@
       <h3 class="narrow_margin">Spawned by:</h3>
       <span id="callchain"></span>
     </div>
-    <div id="flamegraph_background" onclick="onBackgroundClick()">
-      <div id="flamegraph_block" onclick="onBlockClick(event)"
+    <div id="result_background" onclick="onBackgroundClick()">
+      <div id="result_block" onclick="onBlockClick(event)"
            onmousedown="onFlameGraphBlockMouseDown()"
            onmouseup="onFlameGraphBlockMouseUp()">
-        <div id="flamegraph_header">
-          <h2 id="flamegraph_title">Test</h2>
+        <div id="result_header">
+          <h2 id="result_title">Test</h2>
           <p style="text-align: center; color:red" id="sampled_time_warning">
             <b>WARNING:</b> The difference between the exact and sampled
             runtime is <span id="sampled_diff"></span>%, which exceeds
@@ -751,34 +877,55 @@
             on- or off-CPU).
           </p>
           <p style="font-style:italic; text-align:center">
-            Blocks taking less than <span id="flame_graph_threshold">2.50</span>%
-            of total samples are not shown to speed up rendering.
-            Click anywhere outside of the window to exit.
+            To exit, click anywhere outside of the window.
           </p>
-        </div>
-        <div id="flamegraph_choice">
-          <div id="metric_choice">
-            Metric:
-            <select name="metric" id="metric" onchange="onMetricChange(event)">
-
+          <div id="analysis_choice">
+            Analysis type:
+            <select name="analysis" id="analysis" onchange="onAnalysisChange(event)">
+              <option value="flamegraph">Flame graphs</option>
             </select>
-            <input type="checkbox" id="time_ordered"
-                   name="time_ordered" onchange="onTimeOrderedChange(event)">
-            <label for="time_ordered">Time-ordered</label>
           </div>
-          <input type="text" id="search" name="search_query"
-                 oninput="onSearchQueryChange(this.value)"
-                 placeholder="Search..." />
         </div>
-        <div id="flamegraph" class="scrollable">
-          <p id="no_flamegraph">
-            There is no flame graph associated with the selected process/thread,
-            metric, and time order (or the flame graph could not be loaded)!
-            This may be caused by the inability of capturing a specific event
-            for that process/thread (it is a disadvantage of sampling-based
-            profiling).
+        <div id="flamegraph_box">
+          <p id="collapse_info" style="font-style:italic; text-align:center">
+            Some blocks may be collapsed to speed up rendering, but you can expand
+            them by clicking them.
           </p>
-          <div id="svg"></div>
+          <div id="flamegraph_choice">
+            <div id="metric_choice">
+              Metric:
+              <select name="metric" id="metric" onchange="onMetricChange(event)">
+
+              </select>
+              <input type="checkbox" id="time_ordered"
+                     name="time_ordered" onchange="onTimeOrderedChange(event)">
+              <label for="time_ordered">Time-ordered</label>
+            </div>
+            <div id="remainder">
+              <input type="text" id="search" name="search_query"
+                     oninput="onSearchQueryChange(this.value)"
+                     placeholder="Search..." />
+              <!-- This SVG is from Google Material Icons, originally licensed under
+                   Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+                   (covered by GNU GPL v3 here) -->
+              <svg id="download" xmlns="http://www.w3.org/2000/svg" height="24px"
+                   viewBox="0 -960 960 960" width="24px" fill="#000000"
+                   onclick="downloadFlameGraph()">
+                <title>Download the current flame graph view as PNG</title>
+                <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
+              </svg>
+            </div>
+          </div>
+          <div id="flamegraph" class="scrollable">
+            <p id="no_flamegraph">
+              There is no flame graph associated with the selected process/thread,
+              metric, and time order (or the flame graph could not be loaded)!
+              This may be caused by the inability of capturing a specific event
+              for that process/thread (it is a disadvantage of sampling-based
+              profiling).
+            </p>
+            <div id="svg"></div>
+          </div>
         </div>
       </div>
     </div>
