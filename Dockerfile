@@ -1,5 +1,7 @@
 FROM python:latest
 
+RUN apt-get update && apt-get dist-upgrade -y && apt-get install -y nodejs npm
+
 WORKDIR /app
 RUN mkdir adaptiveperf-html
 COPY . adaptiveperf-html/
