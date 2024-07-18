@@ -1,6 +1,7 @@
 # AdaptivePerfHTML: Tool for producing HTML summary of AdaptivePerf results
 # Copyright (C) CERN. See LICENSE for details.
 
+import traceback
 from flask import Flask, render_template, request
 from pathlib import Path
 from . import ProfilingResults, Identifier
@@ -84,6 +85,7 @@ def post(identifier):
         else:
             return '', 400
     except ValueError:
+        traceback.print_exc()
         return '', 404
 
 
