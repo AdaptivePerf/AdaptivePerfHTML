@@ -2,6 +2,7 @@
 # Copyright (C) CERN. See LICENSE for details.
 
 from flask import Flask, render_template, request
+from pathlib import Path
 from . import ProfilingResults, Identifier
 
 
@@ -14,6 +15,14 @@ if 'PROFILING_STORAGE' not in app.config:
                        'variable to the absolute path to a directory where '
                        'AdaptivePerf profiling results are stored '
                        '(usually "results").')
+
+
+static_path = Path(app.root_path) / 'static'
+scripts = list(map(lambda x: x.name,
+                   static_path.glob('*.js')))
+stylesheets = list(map(lambda x: x.name,
+                       static_path.glob('*.css')))
+d3_flamegraph_css = (static_path / 'd3-flamegraph.css').read_text()
 
 
 @app.post('/<identifier>/')
@@ -85,8 +94,12 @@ def main():
     # timeline (as rendering a large number of these regions
     # can be resource-heavy). It works in a similar way to
     # sampling in off-CPU profiling in AdaptivePerf.
-    return render_template('viewer.html',
-                           ids=ProfilingResults.get_all_ids(
-                               app.config['PROFILING_STORAGE']),
-                           offcpu_sampling=app.config.get(
-                               'OFFCPU_SAMPLING', 500))
+    return render_template(
+        'viewer.html',
+        ids=ProfilingResults.get_all_ids(
+            app.config['PROFILING_STORAGE']),
+        offcpu_sampling=app.config.get(
+            'OFFCPU_SAMPLING', 500),
+        scripts=scripts,
+        stylesheets=stylesheets,
+        d3_flamegraph_css=d3_flamegraph_css.replace('\n', ' '))

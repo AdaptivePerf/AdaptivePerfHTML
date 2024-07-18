@@ -7,19 +7,16 @@
 <html>
   <head>
     <title>AdaptivePerf results</title>
-    <link type="text/css" rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css" />
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/d3-flame-graph@4.1.3/dist/d3-flamegraph.css" />
     <script type="application/javascript"
             src="https://code.jquery.com/jquery-3.7.0.min.js"
 	    integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g="
             crossorigin="anonymous"></script>
-    <script type="text/javascript" src="https://d3js.org/d3.v7.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/d3-flame-graph@4.1.3/dist/d3-flamegraph.min.js"></script>
-    <script type="application/javascript"
-            src="{{ url_for('static', filename='vis-timeline-graph2d.min.js') }}"></script>
-    <link type="text/css" rel="stylesheet"
-          href="{{ url_for('static', filename='vis-timeline-graph2d.min.css') }}" />
+    {% for script in scripts %}
+    <script type="text/javascript" src="{{ url_for('static', filename=script) }}"></script>
+    {% endfor %}
+    {% for stylesheet in stylesheets %}
+    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename=stylesheet) }}" />
+    {% endfor %}
     <script type="application/javascript">
       var flamegraph_obj = undefined;
       var result_obj = undefined;
