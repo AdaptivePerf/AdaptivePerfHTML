@@ -16,7 +16,7 @@ The project is distributed under the GNU GPL v3 license. See LICENSE for details
 
 ## Installation
 ### Requirements
-Python 3.6 or newer. All other dependencies are installed automatically when installing AdaptivePerfHTML.
+Python 3.6 or newer. Also, you must have npm and Node.js 18 or newer during the installation process (you will not need these later). All other dependencies are installed automatically when setting up AdaptivePerfHTML.
 
 ### Setup
 This is a Python package, so you can install it with ```pip```:
