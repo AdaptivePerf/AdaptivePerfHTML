@@ -246,10 +246,11 @@
                               $('#metric').append(new Option('Wall time (ns)',
                                                              'walltime'));
 
-                              // Based on https://stackoverflow.com/a/2553045
-                              $.each(metrics_dict[props.group], function (val, text) {
-                                  $('#metric').append(new Option(text, val));
-                              });
+                              var dict = metrics_dict[props.group];
+                              for (var metric_value in dict) {
+                                  $('#metric').append(new Option(dict[metric_value],
+                                                                 metric_value));
+                              }
 
                               $('#metric').val('walltime');
                               $('#time_ordered').prop('checked', false);
@@ -709,6 +710,7 @@
 
       #callchain {
           /* Based on https://meta.stackexchange.com/q/364048 */
+          /* (originally CC BY-SA 4.0, covered by GNU GPL v3 here) */
           font-family:ui-monospace,
                       Cascadia Mono,
                       Segoe UI Mono,
