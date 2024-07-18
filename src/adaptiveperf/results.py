@@ -6,6 +6,7 @@ import sys
 import json
 from treelib import Tree
 from pathlib import Path
+from collections import deque
 
 
 class Identifier:
@@ -193,7 +194,7 @@ class ProfilingResults:
     def get_flame_graph(self, pid, tid, compress_threshold):
         """
         Get a flame graph of the thread/process with a given PID and TID
-        to be rendered by d3-flame-graph, taking into account not to render
+        to be rendered by d3-flame-graph, taking into account to collapse
         blocks taking less than a specified share of total samples.
 
         :param int pid: The PID of a thread/process in the session.
@@ -201,50 +202,9 @@ class ProfilingResults:
         :param float compress_threshold: A compression threshold. For
                                          example, if its value is 0.10,
                                          blocks taking less than 10% of
-                                         total samples will not be
-                                         effectively rendered.
+                                         total samples will be collapsed.
         """
         p = self._path / 'processed' / f'{pid}_{tid}.json'
-
-        def compress_result(result, total, time_ordered):
-            children = result['children']
-            new_children = []
-            compressed_value = 0
-
-            for child in children:
-                if child['value'] < compress_threshold * total:
-                    child['compressed'] = True
-
-                    if not time_ordered:
-                        compressed_value += child['value']
-                else:
-                    compress_result(child, total, time_ordered)
-
-            for child in children:
-                if time_ordered:
-                    if child.get('compressed', False):
-                        compressed_value += child['value']
-                    else:
-                        if compressed_value > 0:
-                            new_children.append({
-                                'name': '(compressed)',
-                                'value': compressed_value,
-                                'children': []
-                            })
-                            compressed_value = 0
-
-                        new_children.append(child)
-                elif not child.get('compressed', False):
-                    new_children.append(child)
-
-            if compressed_value > 0:
-                new_children.append({
-                    'name': '(compressed)',
-                    'value': compressed_value,
-                    'children': []
-                })
-
-            result['children'] = new_children
 
         if not p.exists():
             return None
@@ -257,8 +217,144 @@ class ProfilingResults:
                 raise RuntimeError(f'{k} in {pid}_{tid}.json should have '
                                    f'exactly 2 elements, but it has {len(v)}')
 
-            compress_result(v[0], v[0]['value'], False)
-            compress_result(v[1], v[1]['value'], True)
+            compressed_blocks_lists = [[], []]
+            queue = deque([(v[0], v[0]['value'], False, False,
+                            compressed_blocks_lists[0]),
+                           (v[1], v[1]['value'], True, False,
+                            compressed_blocks_lists[1])])
+
+            while len(queue) > 0:
+                result, total, time_ordered, parent_is_compressed, \
+                    compressed_blocks = queue.pop()
+
+                children = result['children']
+                new_children = []
+                compressed_value = 0
+                hidden_children = []
+                compressed_children = set()
+
+                for i, child in enumerate(children):
+                    if child['value'] < compress_threshold * total:
+                        compressed_children.add(i)
+                    else:
+                        queue.append((child, total, time_ordered, False,
+                                      compressed_blocks))
+
+                for i, child in enumerate(children):
+                    if time_ordered:
+                        if i in compressed_children:
+                            compressed_value += child['value']
+                            hidden_children.append(child)
+                        else:
+                            if compressed_value > 0:
+                                if compressed_value == total \
+                                   and parent_is_compressed:
+                                    new_children += hidden_children
+                                else:
+                                    new_child = {
+                                        'name': '(compressed)',
+                                        'value': compressed_value,
+                                        'children': hidden_children,
+                                        'compressed_id': len(compressed_blocks)
+                                    }
+
+                                    queue.append((new_child,
+                                                  compressed_value,
+                                                  time_ordered,
+                                                  True,
+                                                  compressed_blocks))
+
+                                    compressed_blocks.append(new_child)
+                                    new_children.append(new_child)
+
+                                compressed_value = 0
+                                hidden_children = []
+
+                            new_children.append(child)
+                    else:
+                        if i in compressed_children:
+                            compressed_value += child['value']
+                            hidden_children.append(child)
+                        else:
+                            new_children.append(child)
+
+                if compressed_value > 0:
+                    if len(hidden_children) == 1 and \
+                       len(hidden_children[0]['children']) == 0:
+                        new_children += hidden_children
+                    elif compressed_value == total and parent_is_compressed:
+                        if len(hidden_children) > 1:
+                            part1_cnt = len(hidden_children) // 2
+
+                            compressed_value_part1 = 0
+                            for i in range(part1_cnt):
+                                compressed_value_part1 += \
+                                    hidden_children[i]['value']
+
+                            compressed_value_part2 = compressed_value - \
+                                compressed_value_part1
+
+                            new_child1 = {
+                                'name': '(compressed)',
+                                'value': compressed_value_part1,
+                                'children': hidden_children[:part1_cnt],
+                                'compressed_id': len(compressed_blocks)
+                            }
+
+                            new_child2 = {
+                                'name': '(compressed)',
+                                'value': compressed_value_part2,
+                                'children': hidden_children[part1_cnt:],
+                                'compressed_id': len(compressed_blocks) + 1
+                            }
+
+                            queue.append((new_child1, compressed_value_part1,
+                                          time_ordered, True,
+                                          compressed_blocks))
+                            queue.append((new_child2, compressed_value_part2,
+                                          time_ordered, True,
+                                          compressed_blocks))
+
+                            compressed_blocks.append(new_child1)
+                            compressed_blocks.append(new_child2)
+
+                            new_children.append(new_child1)
+                            new_children.append(new_child2)
+                        else:
+                            new_children += hidden_children
+                    else:
+                        new_child = {
+                            'name': '(compressed)',
+                            'value': compressed_value,
+                            'children': hidden_children,
+                            'compressed_id': len(compressed_blocks)
+                        }
+
+                        queue.append((new_child, compressed_value,
+                                      time_ordered, True,
+                                      compressed_blocks))
+
+                        compressed_blocks.append(new_child)
+                        new_children.append(new_child)
+
+                if 'compressed_id' in result:
+                    result['children'] = []
+                    result['hidden_children'] = new_children
+                else:
+                    result['children'] = new_children
+
+            for compressed_blocks in compressed_blocks_lists:
+                deleted_block_ids = set()
+                for block in compressed_blocks:
+                    if block['compressed_id'] in deleted_block_ids:
+                        continue
+
+                    while (len(block['hidden_children']) == 1 and
+                           'hidden_children' in block['hidden_children'][0]):
+                        deleted_block_ids.add(
+                            block['hidden_children'][0]['compressed_id'])
+                        block['hidden_children'] = \
+                            block['hidden_children'][0]['hidden_children']
 
         return json.dumps(data)
 

@@ -1,7 +1,9 @@
 # AdaptivePerfHTML: Tool for producing HTML summary of AdaptivePerf results
 # Copyright (C) CERN. See LICENSE for details.
 
+import traceback
 from flask import Flask, render_template, request
+from pathlib import Path
 from . import ProfilingResults, Identifier
 
 
@@ -14,6 +16,14 @@ if 'PROFILING_STORAGE' not in app.config:
                        'variable to the absolute path to a directory where '
                        'AdaptivePerf profiling results are stored '
                        '(usually "results").')
+
+
+static_path = Path(app.root_path) / 'static'
+scripts = list(map(lambda x: x.name,
+                   static_path.glob('*.js')))
+stylesheets = list(map(lambda x: x.name,
+                       static_path.glob('*.css')))
+d3_flamegraph_css = (static_path / 'd3-flamegraph.css').read_text()
 
 
 @app.post('/<identifier>/')
@@ -32,10 +42,10 @@ def post(identifier):
       and "threshold" (with a decimal value):
       This instructs AdaptivePerfHTML to return a flame graph of
       the thread/process with a given PID and TID to be rendered by
-      d3-flame-graph, taking into account not to render blocks taking
-      less than a specified share of total samples (e.g. if "threshold" is
-      set to 0.10, blocks taking less than 10% of total samples
-      will not be effectively rendered).
+      d3-flame-graph, taking into account to collapse blocks taking
+      less than a specified share of samples (e.g. if "threshold" is
+      set to 0.10, blocks taking less than 10% of samples
+      will be collapsed, with an option to expand them at runtime).
     * "callchain" (with any value):
       This instructs AdaptivePerfHTML to return the session dictionaries
       mapping compressed symbol names to full symbol names.
@@ -75,6 +85,7 @@ def post(identifier):
         else:
             return '', 400
     except ValueError:
+        traceback.print_exc()
         return '', 404
 
 
@@ -85,8 +96,12 @@ def main():
     # timeline (as rendering a large number of these regions
     # can be resource-heavy). It works in a similar way to
     # sampling in off-CPU profiling in AdaptivePerf.
-    return render_template('viewer.html',
-                           ids=ProfilingResults.get_all_ids(
-                               app.config['PROFILING_STORAGE']),
-                           offcpu_sampling=app.config.get(
-                               'OFFCPU_SAMPLING', 500))
+    return render_template(
+        'viewer.html',
+        ids=ProfilingResults.get_all_ids(
+            app.config['PROFILING_STORAGE']),
+        offcpu_sampling=app.config.get(
+            'OFFCPU_SAMPLING', 500),
+        scripts=scripts,
+        stylesheets=stylesheets,
+        d3_flamegraph_css=d3_flamegraph_css.replace('\n', ' '))

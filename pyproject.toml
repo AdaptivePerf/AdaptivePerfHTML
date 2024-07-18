@@ -33,3 +33,6 @@ sources = ["src"]
 [tool.hatch.build.targets.sdist]
 only-include = ["src/adaptiveperf"]
 sources = ["src"]
+
+[tool.hatch.build.hooks.custom]
+path = "js_setup.py"
