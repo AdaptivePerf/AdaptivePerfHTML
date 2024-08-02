@@ -466,6 +466,12 @@
                   updateFlameGraph(d3.select('#svg').datum().data, false);
               }
           });
+          flamegraph_obj.setSearchHandler(function(results, sum, total) {
+              $('#search_blocks').html(results.length.toLocaleString());
+              $('#search_found').html(sum.toLocaleString());
+              $('#search_total').html(total.toLocaleString());
+              $('#search_percentage').html((1.0 * sum / total * 100).toFixed(2));
+          });
 
           if (metric === 'walltime') {
               flamegraph_obj.setColorHue('warm');
@@ -476,6 +482,7 @@
           $('#no_flamegraph').hide();
           $('#svg').html('');
           $('#search').val('');
+          $('#search_results').hide();
           $('#svg').show();
           $('#result_background').show();
           flamegraph_obj.width($('#result_block').width());
@@ -509,6 +516,7 @@
                   openFlameGraph(metric);
               } else {
                   $('#search').val('');
+                  $('#search_results').hide();
                   $('#svg').hide();
                   $('#no_flamegraph').show();
               }
@@ -521,11 +529,20 @@
               updateFlameGraph(structuredClone(
                   result_obj[$('#metric').val()][
                       event.currentTarget.checked ? 1 : 0]), true);
+
+              $('#search').val('');
+              $('#search_results').hide();
           }
       }
 
       function onSearchQueryChange(value) {
           if (flamegraph_obj !== undefined) {
+              if (value === undefined || value === "") {
+                  $('#search_results').hide();
+              } else {
+                  $('#search_results').show();
+              }
+
               flamegraph_obj.search(value);
           }
       }
@@ -808,6 +825,13 @@
           width:100px;
       }
 
+      #search_results {
+          text-align:center;
+          font-style:italic;
+          margin-bottom:10px;
+          display:none;
+      }
+
       .vis-group-level-unknown-but-gte1 {
           border:0;
       }
@@ -924,6 +948,11 @@
                 <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
               </svg>
             </div>
+          </div>
+          <div id="search_results">
+            <b>Search results:</b> <span id="search_blocks"></span> block(s) accounting for
+            <span id="search_found"></span> unit(s) out of
+            <span id="search_total"></span> (<span id="search_percentage"></span>%)
           </div>
           <div id="flamegraph" class="scrollable">
             <p id="no_flamegraph">
