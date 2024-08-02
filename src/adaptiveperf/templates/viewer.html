@@ -12,10 +12,12 @@
 	    integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g="
             crossorigin="anonymous"></script>
     {% for script in scripts %}
-    <script type="text/javascript" src="{{ url_for('static', filename=script) }}"></script>
+    <script type="text/javascript"
+            src="{{ url_for('static', filename=script) }}"></script>
     {% endfor %}
     {% for stylesheet in stylesheets %}
-    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename=stylesheet) }}" />
+    <link type="text/css" rel="stylesheet"
+          href="{{ url_for('static', filename=stylesheet) }}" />
     {% endfor %}
     <script type="application/javascript">
       var flamegraph_obj = undefined;
@@ -92,7 +94,8 @@
                           json.runtime - json.sampled_time)) / json.runtime;
                       sampled_diff_dict[item.id] = sampled_diff;
                       var warning =
-                          sampled_diff > 1.0 * $('#runtime_diff_threshold_input').val() / 100;
+                          sampled_diff > 1.0 * parseFloat(
+                              $('#runtime_diff_threshold_input').val()) / 100;
 
                       var group = {
                           id: json.id,
@@ -230,13 +233,13 @@
                               $('#result_title').html(item_dict[props.group]);
 
                               if (sampled_diff_dict[props.group] >
-                                  1.0 * $('#runtime_diff_threshold_input').val() / 100) {
+                                  1.0 * parseFloat($('#runtime_diff_threshold_input').val()) / 100) {
                                   $('#sampled_time_warning').show();
                                   $('#sampled_runtime').css('color', 'red');
                                   $('#sampled_diff').html(
                                       (sampled_diff_dict[props.group] * 100).toFixed(2));
                                   $('#runtime_diff_threshold').html(
-                                      $('#runtime_diff_threshold_input').val());
+                                      parseFloat($('#runtime_diff_threshold_input').val()));
                               } else {
                                   $('#sampled_runtime').css('color', 'black');
                                   $('#sampled_time_warning').hide();
@@ -257,10 +260,10 @@
                               $('#flamegraph').attr('data-id', props.group);
 
                               if (props.group + '_' +
-                                  $('#threshold_input').val() in result_cache) {
+                                  parseFloat($('#threshold_input').val()) in result_cache) {
                                   result_obj = result_cache[
-                                      props.group + '_' + $(
-                                          '#threshold_input').val()];
+                                      props.group + '_' + parseFloat($(
+                                          '#threshold_input').val())];
 
                                   if (!('walltime' in result_obj)) {
                                       flamegraph_obj = undefined;
@@ -281,12 +284,12 @@
                                       method: 'POST',
                                       dataType: 'json',
                                       data: {pid: pid_tid[0], tid: pid_tid[1],
-                                             threshold: 1.0 * $(
-                                                 '#threshold_input').val() / 100}
+                                             threshold: 1.0 * parseFloat($(
+                                                 '#threshold_input').val()) / 100}
                                   }).done(ajax_obj => {
                                       result_cache[
-                                          props.group + '_' + $(
-                                              '#threshold_input').val()] = ajax_obj;
+                                          props.group + '_' + parseFloat($(
+                                              '#threshold_input').val())] = ajax_obj;
                                       result_obj = ajax_obj;
 
                                       if (!('walltime' in result_obj)) {
@@ -339,7 +342,7 @@
                               $('#callchain_block').css('display', 'flex');
 
                               if (sampled_diff_dict[props.group] >
-                                  1.0 * $('#runtime_diff_threshold_input').val() / 100) {
+                                  1.0 * parseFloat($('#runtime_diff_threshold_input').val()) / 100) {
                                   $('#tooltip_sampled_runtime').css('color', 'red');
                               } else {
                                   $('#tooltip_sampled_runtime').css('color', 'black');
@@ -621,6 +624,38 @@
           image.src = url;
       }
 
+      function checkValidPercentage(event) {
+          var input = event.target;
+
+          if (input.value === '' || input.value === undefined) {
+              input.value = '0';
+          } else {
+              var number = parseFloat(input.value);
+
+              if (isNaN(number)) {
+                  input.value = '0';
+              } else if (input.min !== undefined && input.min !== '' &&
+                         number < input.min) {
+                  input.value = input.min;
+              } else if (input.max !== undefined && input.max !== '' &&
+                         number > input.max) {
+                  input.value = input.max;
+              } else if (event.key === 'Enter') {
+                  input.value = number;
+              }
+          }
+      }
+
+      function insertValidPercentage(input) {
+          var number = parseFloat(input.value);
+
+          if (isNaN(number)) {
+              input.value = '0';
+          } else {
+              input.value = number;
+          }
+      }
+
       $(document).ready(function() {
           new ResizeObserver(onFlameGraphBlockResize).observe(
               $('#result_block')[0]);
@@ -876,13 +911,17 @@
           </p>
           <p style="font-style:italic">
             Do not display flame graph blocks taking less than
-            this % of samples: <input type="number" value="2.50"
-                                      step=".1" id="threshold_input" />
+            this % of samples: <input type="number" value="2.50" min="0" max="100"
+                                      step=".1" id="threshold_input"
+                                      onkeyup="checkValidPercentage(event)"
+                                      onfocusout="insertValidPercentage(this)" />
           </p>
           <p style="font-style:italic">
             Warn if the difference between exact and sampled runtime exceeds
-            this %: <input type="number" value="50", step="1"
-                           id="runtime_diff_threshold_input" />
+            this %: <input type="number" value="50", step="1" min="0"
+                           id="runtime_diff_threshold_input"
+                           onkeyup="checkValidPercentage(event)"
+                           onfocusout="insertValidPercentage(this)" />
           </p>
         </span>
       </div>
