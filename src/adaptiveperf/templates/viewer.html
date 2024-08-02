@@ -401,16 +401,23 @@
 
       function updateFlameGraph(data, always_change_height) {
           if (flamegraph_obj !== undefined) {
+              var update_height = function() {
+                  var flamegraph_svg = $('#svg').children()[0];
+
+                  if (flamegraph_svg !== undefined) {
+                      var target_height = flamegraph_svg.getBBox().height;
+
+                      if (always_change_height || target_height > $('#svg').height()) {
+                          $('#svg').height(target_height);
+                          flamegraph_svg.setAttribute('height', target_height);
+                      }
+                  }
+              };
+
               if (data !== null) {
-                  flamegraph_obj.update(data);
-              }
-
-              var flamegraph_svg = $('#svg').children()[0];
-              var target_height = flamegraph_svg.getBBox().height;
-
-              if (always_change_height || target_height > $('#svg').height()) {
-                  $('#svg').height(target_height);
-                  flamegraph_svg.setAttribute('height', target_height);
+                  flamegraph_obj.update(data, update_height);
+              } else {
+                  update_height();
               }
           }
       }
