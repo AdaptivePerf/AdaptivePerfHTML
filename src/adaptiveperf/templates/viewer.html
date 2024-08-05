@@ -29,6 +29,7 @@
       var sampled_diff_dict = {};
       var flamegraph_block_being_resized = false;
       var flamegraph_block_mouse_down = false;
+      var flamegraph_total = 0;
 
       function getSymbolFromMap(elem) {
           if (elem in perf_maps_cache) {
@@ -418,6 +419,7 @@
               };
 
               if (data !== null) {
+                  flamegraph_total = data['value'];
                   flamegraph_obj.update(data, update_height);
               } else {
                   update_height();
@@ -472,8 +474,8 @@
           flamegraph_obj.setSearchHandler(function(results, sum, total) {
               $('#search_blocks').html(results.length.toLocaleString());
               $('#search_found').html(sum.toLocaleString());
-              $('#search_total').html(total.toLocaleString());
-              $('#search_percentage').html((1.0 * sum / total * 100).toFixed(2));
+              $('#search_total').html(flamegraph_total.toLocaleString());
+              $('#search_percentage').html((1.0 * sum / flamegraph_total * 100).toFixed(2));
           });
 
           if (metric === 'walltime') {
@@ -493,6 +495,7 @@
               result_obj[metric][
                   $('#time_ordered').prop('checked') ? 1 : 0])).call(
                       flamegraph_obj);
+          flamegraph_total = d3.select('#svg').datum().data['value'];
           updateFlameGraph(null, true);
           $('#flamegraph')[0].scrollTop = 0;
       }
