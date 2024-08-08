@@ -488,6 +488,7 @@
           $('#svg').html('');
           $('#search').val('');
           $('#search_results').hide();
+          $('#flamegraph_window').show();
           $('#svg').show();
           $('#result_background').show();
           flamegraph_obj.width($('#result_block').width());
@@ -497,17 +498,52 @@
                       flamegraph_obj);
           flamegraph_total = d3.select('#svg').datum().data['value'];
           updateFlameGraph(null, true);
+          flamegraph_obj.width($('#svg').width());
+          flamegraph_obj.update();
+
+          var pos = $('#flamegraph_window').position();
+          $('#flamegraph_window').css('max-height', ($('#result_area').height() - pos.top) + 'px');
+          $('#flamegraph_window').css('max-width', ($('#result_area').width() - pos.left) + 'px');
+
+          $('.window').hide();
+          $('.analysis_type').prop('checked', false);
           $('#flamegraph')[0].scrollTop = 0;
       }
 
+      function onAnalysisCheckBoxClick(event) {
+          var checkbox = event.target;
+          var id = checkbox.value + '_window';
+
+          if (checkbox.checked) {
+              $('#' + id).show();
+          } else {
+              $('#' + id).hide();
+          }
+      }
+
       function onBackgroundClick() {
-          $('#svg').html('');
-          $('#result_background').hide();
           $('#callchain_block').hide();
       }
 
       function onBlockClick(event) {
           event.stopPropagation();
+          event.preventDefault();
+      }
+
+      function onResultCloseClick() {
+          $('#svg').html('');
+          $('#result_background').hide();
+      }
+
+      function onWindowCloseClick(event) {
+          var target = event.target;
+
+          while (!target.classList.contains('window')) {
+              target = target.parentElement;
+          }
+
+          $(target).hide();
+          $('#' + target.id.replace('_window', '_checkbox')).prop('checked', false);
       }
 
       function onMetricChange(event) {
@@ -659,9 +695,53 @@
           }
       }
 
+      function startDrag(event) {
+          event.stopPropagation();
+          event.preventDefault();
+
+          var dragged = event.target.parentElement;
+          var startX = event.offsetX;
+          var startY = event.offsetY;
+          var rect = $('#result_area').offset();
+
+          $('body').mousemove(function(event) {
+              event.stopPropagation();
+              event.preventDefault();
+              var newX = event.pageX - rect.left - startX;
+              var newY = event.pageY - rect.top - startY;
+              var dragged_rect = dragged.getBoundingClientRect();
+
+              if (newX >= 0 && newX + dragged_rect.width <= $('#result_area').width()) {
+                  dragged.style.left = newX + 'px';
+              }
+
+              if (newY >= 0 && newY + dragged_rect.height <= $('#result_area').height()) {
+                  dragged.style.top = newY + 'px';
+              }
+          });
+
+          $('body').mouseup(function(event) {
+              $('body').off('mousemove');
+              $('body').off('mouseup');
+
+              var new_max_height = $('#result_area').height() - dragged.offsetTop;
+              var new_max_width = $('#result_area').width() - dragged.offsetLeft;
+
+              if (parseFloat(dragged.style.width) > parseFloat(dragged.style.maxWidth)) {
+                  dragged.style.width = dragged.style.maxWidth;
+              }
+
+              if (parseFloat(dragged.style.height) > parseFloat(dragged.style.maxHeight)) {
+                  dragged.style.height = dragged.style.maxHeight;
+              }
+
+              dragged.style.maxHeight = new_max_height + 'px';
+              dragged.style.maxWidth = new_max_width + 'px';
+          });
+      }
+
       $(document).ready(function() {
-          new ResizeObserver(onFlameGraphBlockResize).observe(
-              $('#result_block')[0]);
+          new ResizeObserver(onFlameGraphBlockResize).observe($('#flamegraph_window')[0]);
       });
     </script>
     <style type="text/css">
@@ -742,8 +822,13 @@
 
       #result_block {
           position:fixed;
+          min-height:400px;
+          min-width:1050px;
           max-height:90vh;
-          resize:horizontal;
+          max-width:90vw;
+          height:70vh;
+          width:70vw;
+          resize:both;
           overflow:hidden;
           border-radius:10px;
           padding:10px;
@@ -767,7 +852,7 @@
       }
 
       #callchain_block {
-          box-shadow:10px 10px 5px;
+          box-shadow:3px 3px 10px;
       }
 
       #callchain {
@@ -787,24 +872,13 @@
       #result_title {
           width:100%;
           text-align:center;
-          margin:10px;
-      }
-
-      #analysis_choice {
-          width:100%;
-          text-align:center;
-          border-bottom-width:1px;
-          border-bottom-color:grey;
-          border-bottom-style:solid;
-          padding-bottom:20px;
-      }
-
-      #analysis {
-          min-width:250px;
+          margin-top:10px;
+          margin-left:10px;
+          margin-right:10px;
+          margin-bottom:20px;
       }
 
       #flamegraph_box {
-          width:100%;
           overflow:hidden;
           display:flex;
           flex-direction:column;
@@ -827,6 +901,7 @@
 
       #flamegraph {
           flex-grow:1;
+          overflow-x:hidden;
       }
 
       #metric_choice {
@@ -870,6 +945,63 @@
           display:none;
       }
 
+      #result_box {
+          display:flex;
+          flex-direction:row;
+          flex-grow:1;
+      }
+
+      #analysis {
+          min-width:200px;
+          margin-right:10px;
+      }
+
+      #result_parent_area {
+          flex-grow:1;
+          background-color:grey;
+          display:flex;
+      }
+
+      #result_area {
+          flex-grow:1;
+          background-color:grey;
+          margin:15px;
+          position:relative;
+      }
+
+      #flamegraph_window {
+          min-width:750px;
+          width:750px;
+          min-height:200px;
+          height:300px;
+      }
+
+      .window {
+          position:absolute;
+          display:flex;
+          flex-direction:column;
+          border-style:solid;
+          border-color:black;
+          border-width:2px;
+          overflow:hidden;
+          resize:both;
+          box-shadow:3px 3px 10px;
+      }
+
+      .window_header {
+          background-color:black;
+          color:white;
+          padding:5px;
+          cursor:grab;
+      }
+
+      .window_content {
+          overflow:hidden;
+          background-color:white;
+          flex-grow:1;
+          padding:5px;
+      }
+
       .vis-group-level-unknown-but-gte1 {
           border:0;
       }
@@ -884,6 +1016,34 @@
 
       .narrow_margin {
           margin-top:0;
+          margin-bottom:10px;
+      }
+
+      .window_title {
+          float:left;
+          display:flex;
+          align-items:center;
+          height:100%;
+      }
+
+      .window_close {
+          float:right;
+          display:flex;
+          align-items:center;
+          cursor:initial;
+          height:100%;
+      }
+
+      #result_close {
+          position:absolute;
+          right:5px;
+          top:5px;
+      }
+
+      #collapse_info {
+          font-style:italic;
+          text-align:center;
+          margin-top:5px;
           margin-bottom:10px;
       }
     </style>
@@ -938,10 +1098,19 @@
       <span id="callchain"></span>
     </div>
     <div id="result_background" onclick="onBackgroundClick()">
-      <div id="result_block" onclick="onBlockClick(event)"
+      <div id="result_block"
            onmousedown="onFlameGraphBlockMouseDown()"
            onmouseup="onFlameGraphBlockMouseUp()">
         <div id="result_header">
+          <!-- This SVG is from Google Material Icons, originally licensed under
+               Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+               (covered by GNU GPL v3 here) -->
+          <svg xmlns="http://www.w3.org/2000/svg" id="result_close"
+               height="24px"
+               viewBox="0 -960 960 960"
+               width="24px" fill="#000000" onclick="onResultCloseClick()">
+            <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
+          </svg>
           <h2 id="result_title"></h2>
           <p style="text-align: center; color:red" id="sampled_time_warning">
             <b>WARNING:</b> The difference between the exact and sampled
@@ -951,62 +1120,79 @@
             frequency (depending on whether the process/thread runs mostly
             on- or off-CPU).
           </p>
-          <p style="font-style:italic; text-align:center">
-            To exit, click anywhere outside of the window.
-          </p>
-          <div id="analysis_choice">
-            Analysis type:
-            <select name="analysis" id="analysis" onchange="onAnalysisChange(event)">
-              <option value="flamegraph">Flame graphs</option>
-            </select>
-          </div>
         </div>
-        <div id="flamegraph_box">
-          <p id="collapse_info" style="font-style:italic; text-align:center">
-            Some blocks may be collapsed to speed up rendering, but you can expand
-            them by clicking them.
-          </p>
-          <div id="flamegraph_choice">
-            <div id="metric_choice">
-              Metric:
-              <select name="metric" id="metric" onchange="onMetricChange(event)">
+        <div id="result_box">
+          <fieldset id="analysis">
+            <legend><b>Analysis types</b></legend>
+            <input type="checkbox" class="analysis_type" value="flamegraph"
+                   id="flamegraph_checkbox"
+                   onclick="onAnalysisCheckBoxClick(event)" />
+            <label for="flamegraph_checkbox">Flame graphs</label>
+          </fieldset>
+          <div id="result_parent_area">
+            <div id="result_area">
+              <div id="flamegraph_window" class="window">
+                <div class="window_header" onmousedown="startDrag(event)">
+                  <span class="window_title">Flame graphs</span>
+                  <span class="window_close">
+                    <!-- This SVG is from Google Material Icons, originally licensed under
+                         Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+                         (covered by GNU GPL v3 here) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px"
+                         viewBox="0 -960 960 960"
+                         width="24px" fill="#ffffff" onclick="onWindowCloseClick(event)">
+                      <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
+                    </svg>
+                </div>
+                <div id="flamegraph_box" class="window_content">
+                  <span id="collapse_info">
+                    Some blocks may be collapsed to speed up rendering, but you can expand
+                    them by clicking them.
+                  </span>
+                  <div id="flamegraph_choice">
+                    <div id="metric_choice">
+                      Metric:
+                      <select name="metric" id="metric" onchange="onMetricChange(event)">
 
-              </select>
-              <input type="checkbox" id="time_ordered"
-                     name="time_ordered" onchange="onTimeOrderedChange(event)">
-              <label for="time_ordered">Time-ordered</label>
+                      </select>
+                      <input type="checkbox" id="time_ordered"
+                             name="time_ordered" onchange="onTimeOrderedChange(event)">
+                      <label for="time_ordered">Time-ordered</label>
+                    </div>
+                    <div id="remainder">
+                      <input type="text" id="search" name="search_query"
+                             oninput="onSearchQueryChange(this.value)"
+                             placeholder="Search..." />
+                      <!-- This SVG is from Google Material Icons, originally licensed under
+                           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+                           (covered by GNU GPL v3 here) -->
+                      <svg id="download" xmlns="http://www.w3.org/2000/svg" height="24px"
+                           viewBox="0 -960 960 960" width="24px" fill="#000000"
+                           onclick="downloadFlameGraph()">
+                        <title>Download the current flame graph view as PNG</title>
+                        <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div id="search_results">
+                    <b>Search results:</b> <span id="search_blocks"></span> block(s) accounting for
+                    <span id="search_found"></span> unit(s) out of
+                    <span id="search_total"></span> (<span id="search_percentage"></span>%)
+                  </div>
+                  <div id="flamegraph" class="scrollable">
+                    <p id="no_flamegraph">
+                      There is no flame graph associated with the selected process/thread,
+                      metric, and time order (or the flame graph could not be loaded)!
+                      This may be caused by the inability of capturing a specific event
+                      for that process/thread (it is a disadvantage of sampling-based
+                      profiling).
+                    </p>
+                    <div id="svg"></div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div id="remainder">
-              <input type="text" id="search" name="search_query"
-                     oninput="onSearchQueryChange(this.value)"
-                     placeholder="Search..." />
-              <!-- This SVG is from Google Material Icons, originally licensed under
-                   Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-                   (covered by GNU GPL v3 here) -->
-              <svg id="download" xmlns="http://www.w3.org/2000/svg" height="24px"
-                   viewBox="0 -960 960 960" width="24px" fill="#000000"
-                   onclick="downloadFlameGraph()">
-                <title>Download the current flame graph view as PNG</title>
-                <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
-              </svg>
-            </div>
           </div>
-          <div id="search_results">
-            <b>Search results:</b> <span id="search_blocks"></span> block(s) accounting for
-            <span id="search_found"></span> unit(s) out of
-            <span id="search_total"></span> (<span id="search_percentage"></span>%)
-          </div>
-          <div id="flamegraph" class="scrollable">
-            <p id="no_flamegraph">
-              There is no flame graph associated with the selected process/thread,
-              metric, and time order (or the flame graph could not be loaded)!
-              This may be caused by the inability of capturing a specific event
-              for that process/thread (it is a disadvantage of sampling-based
-              profiling).
-            </p>
-            <div id="svg"></div>
-          </div>
-        </div>
       </div>
     </div>
     <div id="please_wait_background">
