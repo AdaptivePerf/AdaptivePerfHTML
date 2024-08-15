@@ -58,7 +58,7 @@ $(document).on('change', '#results_combobox', function() {
                                        item_list, group_list,
                                        item_dict, metrics_dict,
                                        callchain_dict, tooltip_dict,
-                                       warning_dict) {
+                                       warning_dict, overall_end_time) {
                 var item = {
                     id: json.id,
                     group: json.id,
@@ -68,6 +68,9 @@ $(document).on('change', '#results_combobox', function() {
                     end: json.start_time + json.runtime,
                     style: 'background-color:#aa0000; z-index:-1'
                 };
+
+                overall_end_time[0] = Math.max(overall_end_time[0],
+                                               json.start_time + json.runtime);
 
                 var sampled_diff = (1.0 * Math.abs(
                     json.runtime - json.sampled_time)) / json.runtime;
@@ -146,7 +149,8 @@ $(document).on('change', '#results_combobox', function() {
                                       metrics_dict,
                                       callchain_dict,
                                       tooltip_dict,
-                                      warning_dict);
+                                      warning_dict,
+                                      overall_end_time);
                 }
             }
 
@@ -175,12 +179,13 @@ $(document).on('change', '#results_combobox', function() {
                 var metrics_dict = {};
                 var tooltip_dict = {};
                 var warning_dict = {};
+                var overall_end_time = [0];
 
                 from_json_to_item(JSON.parse(result), 0,
                                   item_list, group_list, item_dict,
                                   metrics_dict,
                                   callchain_dict, tooltip_dict,
-                                  warning_dict);
+                                  warning_dict, overall_end_time);
 
                 var container = $('#block')[0];
                 container.innerHTML = '';
@@ -203,7 +208,9 @@ $(document).on('change', '#results_combobox', function() {
                                 year:       'x'
                             }
                         },
-                        showMajorLabels: false
+                        showMajorLabels: false,
+                        min: 0,
+                        max: 2 * overall_end_time[0]
                     }
                 );
 
