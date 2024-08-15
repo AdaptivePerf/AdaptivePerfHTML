@@ -197,15 +197,15 @@ $(document).on('change', '#results_combobox', function() {
                     {
                         format: {
                             minorLabels: {
-                                millisecond:'x',
-                                second:     'x',
-                                minute:     'x',
-                                hour:       'x',
-                                weekday:    'x',
-                                day:        'x',
-                                week:       'x',
-                                month:      'x',
-                                year:       'x'
+                                millisecond:'x [ms]',
+                                second:     'X [s]',
+                                minute:     'X [s]',
+                                hour:       'X [s]',
+                                weekday:    'X [s]',
+                                day:        'X [s]',
+                                week:       'X [s]',
+                                month:      'X [s]',
+                                year:       'X [s]'
                             }
                         },
                         showMajorLabels: false,
