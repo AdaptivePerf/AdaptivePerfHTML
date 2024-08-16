@@ -80,6 +80,7 @@
           width:100%;
           height:100%;
           background-color: rgba(0, 0, 0, 0.5);
+          z-index:1000;
       }
 
       #callchain {
@@ -328,6 +329,11 @@
     </style>
   </head>
   <body onclick="onBackgroundClick()">
+    <div id="please_wait_background">
+      <div id="please_wait_block">
+        <h1>Please wait...</h1>
+      </div>
+    </div>
     <div id="main">
       <div id="header">
         <h1>AdaptivePerf results</h1>
@@ -471,11 +477,6 @@
               </div>
             </div>
           </div>
-      </div>
-    </div>
-    <div id="please_wait_background">
-      <div id="please_wait_block">
-        <h1>Please wait...</h1>
       </div>
     </div>
   </body>
