@@ -1,4 +1,69 @@
+
+#include <nlohmann/json.hpp>
 #include "tree_parse.hpp"
+#include <iostream>
+#include <fstream>
+
+using json = nlohmann::json;
+
+TreeNode parse_json_to_tree(const json& j_node) {
+    TreeNode node;
+    node.name = j_node.value("name", "");
+    node.value = 0;
+    
+    if (j_node.contains("value")) {
+        if (j_node["value"].is_number_unsigned()) {
+            node.value = j_node["value"].get<uint64_t>();
+        } else if (j_node["value"].is_number_integer()) {
+            node.value = static_cast<uint64_t>(j_node["value"].get<int64_t>());
+        }
+    }
+
+    node.cold = j_node.value("cold", false);
+    node.left_sum = 0;
+
+    if (j_node.contains("children")) {
+        for (const auto& child : j_node["children"]) {
+            node.children.push_back(parse_json_to_tree(child));
+        }
+    }
+    return node;
+}
+
+
+
+json tree_to_json(const TreeNode& node) {
+    json j_node;
+    j_node["name"] = node.name;
+    j_node["value"] = node.value;
+    j_node["left_sum"] = node.left_sum;
+    j_node["cold"] = node.cold;
+
+    for (const auto& child : node.children) {
+        j_node["children"].push_back(tree_to_json(child));
+    }
+
+    return j_node;
+}
+
+void save_json_to_file(const json& j, const std::string& filename) {
+    std::ofstream file(filename);
+    if (file.is_open()) {
+        file << j.dump();
+        file.close();
+    } else {
+        std::cerr << "Unable to open file: " << filename << std::endl;
+    }
+}
+
+void print_tree(const TreeNode& node, int level = 0) {
+    std::string indent(level * 2, ' ');
+    std::cout << indent << "Name: " << node.name << ", Value: " << node.value << ", Left Sum: " << node.left_sum << "\n";
+    for (const auto& child : node.children) {
+        print_tree(child, level + 1);
+    }
+}
+
 
 int main() {
     std::ifstream file("data2.json"); //this is only for test
@@ -22,13 +87,18 @@ int main() {
         calculate_left_sum(second_node, running_sum);
 
        
-        uint64_t threshold_left = 100000000; // - start_time if needed
-        uint64_t threshold_right = 8000000000; // - start_time if needed
+        uint64_t threshold_left =  100000000; // - start_time if needed
+        uint64_t threshold_right = 200000000; // - start_time if needed
 
         TreeNode pruned_tree = prune_tree(second_node, threshold_left, threshold_right);
 
         json pruned_tree_json = tree_to_json(pruned_tree);
         save_json_to_file(pruned_tree_json, "pruned_tree.json");
+
+
+
+        std::cout << "\nPruned Tree :\n"; //tree that only includes nodes which overlap with the time period between with two thresholds
+        print_tree(second_node);
 
         std::cout << "\nPruned Tree :\n"; //tree that only includes nodes which overlap with the time period between with two thresholds
         print_tree(pruned_tree);
