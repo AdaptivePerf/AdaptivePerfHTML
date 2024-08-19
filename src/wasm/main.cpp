@@ -12,11 +12,7 @@ TreeNode parse_json_to_tree(const json& j_node) {
     node.value = 0;
     
     if (j_node.contains("value")) {
-        if (j_node["value"].is_number_unsigned()) {
-            node.value = j_node["value"].get<uint64_t>();
-        } else if (j_node["value"].is_number_integer()) {
-            node.value = static_cast<uint64_t>(j_node["value"].get<int64_t>());
-        }
+        node.value = j_node["value"].get<uint64_t>();
     }
 
     node.cold = j_node.value("cold", false);
@@ -73,11 +69,7 @@ int main() {
     u_int16_t start_time = 0;
 
     if(j.contains("first_time")){
-         if (j["first_time"].is_number_unsigned()) {
-            start_time = j["first_time"].get<uint64_t>();
-        } else if (j["first_time"].is_number_integer()) {
-            start_time = static_cast<uint64_t>(j["first_time"].get<int64_t>());
-        }
+        start_time = j["first_time"].get<uint64_t>();
     }
 
     if (j.contains("walltime") && j["walltime"].size() > 1) {
@@ -97,7 +89,7 @@ int main() {
 
 
 
-        std::cout << "\nPruned Tree :\n"; //tree that only includes nodes which overlap with the time period between with two thresholds
+        std::cout << "\nFull Tree :\n"; //tree that only includes nodes which overlap with the time period between with two thresholds
         print_tree(second_node);
 
         std::cout << "\nPruned Tree :\n"; //tree that only includes nodes which overlap with the time period between with two thresholds
