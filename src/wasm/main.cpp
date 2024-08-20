@@ -17,6 +17,16 @@ TreeNode parse_json_to_tree(const json &j_node) {
   node.cold = j_node.value("cold", false);
   node.left_sum = 0;
 
+
+   if (j_node.contains("samples")) {
+    for (const auto &sample : j_node["samples"]) {
+      Sample s;
+      s.timestamp = sample["timestamp"].get<uint64_t>();
+      s.value = sample["period"].get<uint64_t>();
+      node.samples.push_back(s);
+    }
+  }
+
   if (j_node.contains("children")) {
     for (const auto &child : j_node["children"]) {
       node.children.push_back(parse_json_to_tree(child));
@@ -32,6 +42,11 @@ json tree_to_json(const TreeNode &node) {
   j_node["value"] = node.value;
   j_node["left_sum"] = node.left_sum;
   j_node["cold"] = node.cold;
+  j_node["samples"] = json::array();
+
+  for (const auto &sample : node.samples) {
+    j_node["samples"].push_back({{"timestamp", sample.timestamp},{"period", sample.value}});
+  }
 
   for (const auto &child : node.children) {
     j_node["children"].push_back(tree_to_json(child));
@@ -53,7 +68,12 @@ void save_json_to_file(const json &j, const std::string &filename) {
 void print_tree(const TreeNode &node, int level = 0) {
   std::string indent(level * 2, ' ');
   std::cout << indent << "Name: " << node.name << ", Value: " <<
-    node.value << ", Left Sum: " << node.left_sum << "\n";
+    node.value << ", Left Sum: " << node.left_sum << ", Samples  ";
+
+  for (const auto &sample : node.samples) {
+    std::cout <<"ts: " << sample.timestamp << " val: " << sample.value<<"; ";
+  }
+  std::cout<< std::endl;
   for (const auto &child : node.children) {
     print_tree(child, level + 1);
   }
@@ -64,23 +84,26 @@ int main() {
   json j;
   file >> j;
 
-  u_int16_t start_time = 0;
+  uint64_t start_time = 0;
 
   if (j.contains("first_time")) {
+
     start_time = j["first_time"].get<uint64_t>();
+    //start_time = j["first_time"].get<uint64_t>();
   }
 
-  if (j.contains("walltime") && j["walltime"].size() > 1) {
-    TreeNode second_node = parse_json_to_tree(j["walltime"][1]); // time ordered json
+  std::string counter_tree_key = "walltime";
 
-    uint64_t running_sum = 0;
-    calculate_left_sum(second_node, running_sum);
+  if (j.contains(counter_tree_key) && j[counter_tree_key].size() > 1) {
+    TreeNode second_node = parse_json_to_tree(j[counter_tree_key][1]); // time ordered json
 
-    uint64_t threshold_left =  100000000; // - start_time if needed
-    uint64_t threshold_right = 200000000; // - start_time if needed
+    std::cout<<"first time "<<start_time<<std::endl;
+    uint64_t threshold_left =  0; // - start_time if needed
+    uint64_t threshold_right = 2292600756 + start_time; // - start_time if needed
+
 
     TreeNode pruned_tree = prune_tree(second_node, threshold_left,
-                                      threshold_right);
+                                      threshold_right, counter_tree_key);
 
     json pruned_tree_json = tree_to_json(pruned_tree);
     save_json_to_file(pruned_tree_json, "pruned_tree.json");
