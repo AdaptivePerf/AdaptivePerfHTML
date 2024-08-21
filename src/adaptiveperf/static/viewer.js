@@ -1,3 +1,14 @@
+// Window directory structure:
+// {
+//     '<div ID>': {
+//         'type': '<analysis type, e.g. flame_graphs>',
+//         'data': {
+//             <data relevant to analysis type>
+//         }
+//     }
+// }
+var window_dict = {};
+
 var flamegraph_obj = undefined;
 var result_obj = undefined;
 var result_cache = {};
@@ -101,14 +112,43 @@ $(document).on('change', '#results_combobox', function() {
 
                 var numf = new Intl.NumberFormat('en-US');
 
-                item_dict[item.id] = json.name + ' (' + json.pid_tid +
-                    '): ' + numf.format(json.runtime) +
-                    ' ms <span id="sampled_runtime">(sampled: ~' +
-                    numf.format(json.sampled_time) + ' ms)</span>';
-                tooltip_dict[item.id] = 'Runtime: ' +
-                    numf.format(json.runtime) +
-                    ' ms <span id="tooltip_sampled_runtime">(sampled: ~' +
-                    numf.format(json.sampled_time) + ' ms)</span>';
+                json.runtime = json.runtime.toFixed(3);
+                json.sampled_time = json.sampled_time.toFixed(3);
+
+                var default_runtime;
+                var default_sampled_time;
+                var default_unit;
+
+                if (json.runtime >= 1000 || json.sampled_time >= 1000) {
+                    default_runtime = (json.runtime / 1000).toFixed(3);
+                    default_sampled_time = (json.sampled_time / 1000).toFixed(3);
+                    default_unit = 's';
+                } else {
+                    default_runtime = json.runtime;
+                    default_sampled_time = json.sampled_time;
+                    default_unit = 'ms';
+                }
+
+                item_dict[item.id] =
+                    [json.name + ' (' + json.pid_tid +
+                     '): ' + numf.format(default_runtime) +
+                     ' ' + default_unit + ' <span id="sampled_runtime">(sampled: ~' +
+                     numf.format(default_sampled_time) + ' ' + default_unit + ')</span>',
+                     json.name + ' (' + json.pid_tid +
+                     '): ' + numf.format(json.runtime) +
+                     ' ms <span id="sampled_runtime">(sampled: ~' +
+                     numf.format(json.sampled_time) + ' ms)</span>'];
+                tooltip_dict[item.id] =
+                    ['Runtime: ' +
+                     numf.format(default_runtime) +
+                     ' ' + default_unit + '<br /><span id="tooltip_sampled_runtime">' +
+                     '(sampled: ~' +
+                     numf.format(default_sampled_time) + ' ' + default_unit +
+                     ')</span>',
+                     'Runtime: ' +
+                     numf.format(json.runtime) +
+                     ' ms<br /><span id="tooltip_sampled_runtime">(sampled: ~' +
+                     numf.format(json.sampled_time) + ' ms)</span>'];
                 metrics_dict[item.id] = json.metrics;
                 warning_dict[item.id] = [warning, sampled_diff];
 
@@ -121,7 +161,7 @@ $(document).on('change', '#results_combobox', function() {
                     var end = start + json.off_cpu[i][1];
                     var offcpu_sampling =
                         $('#viewer_script').attr('data-offcpu-sampling');
-                    
+
                     if (start % offcpu_sampling === 0 ||
                         end % offcpu_sampling === 0 ||
                         Math.floor(start / offcpu_sampling) != Math.floor(
@@ -217,7 +257,14 @@ $(document).on('change', '#results_combobox', function() {
                 timeline.on('doubleClick', function (props) {
                     if (props.group != null) {
                         $('#please_wait_background').show();
-                        $('#result_title').html(item_dict[props.group]);
+
+                        var runtime_select = 0;
+
+                        if ($('#always_ms').prop('checked')) {
+                            runtime_select = 1;
+                        }
+
+                        $('#result_title').html(item_dict[props.group][runtime_select]);
 
                         if (sampled_diff_dict[props.group] >
                             1.0 * parseFloat($('#runtime_diff_threshold_input').val()) / 100) {
@@ -303,48 +350,67 @@ $(document).on('change', '#results_combobox', function() {
                 });
 
                 timeline.on('contextmenu', function (props) {
-                    if (props.group != null && props.group in callchain_dict) {
-                        $('#callchain').text(callchain_dict[props.group].map(elem => {
-                            if (callchain_obj !== undefined &&
-                                elem in callchain_obj['syscall']) {
-                                return callchain_obj['syscall'][elem];
-                            } else if (/^\(0x[0-9a-f]+;.+\)$/.test(elem)) {
-                                return getSymbolFromMap(elem);
-                            } else if (/^\[.+\]$/.test(elem) ||
-                                       /^\(0x[0-9a-f]+\)$/.test(elem)) {
-                                return elem;
-                            } else {
-                                return elem +
-                                    ' (not-yet-loaded or missing ' +
-                                    'callchain dictionary)';
-                            }
-                        }).join('\n'));
-                        $('#callchain').html(
-                            $('#callchain').html().replace(/\n/g, '<br />'));
-                        $('#callchain_block_title').html(
-                            tooltip_dict[props.group]);
-                        $('#callchain_block').css('top', props.pageY);
-                        $('#callchain_block').css('left', props.pageX);
-                        $('#callchain_block').outerHeight('auto');
-                        $('#callchain_block').css('display', 'flex');
+                    if (props.group != null) {
+                        if (props.group in callchain_dict) {
+                            $('#callchain').text(callchain_dict[props.group].map(elem => {
+                                if (callchain_obj !== undefined &&
+                                    elem in callchain_obj['syscall']) {
+                                    return callchain_obj['syscall'][elem];
+                                } else if (/^\(0x[0-9a-f]+;.+\)$/.test(elem)) {
+                                    return getSymbolFromMap(elem);
+                                } else if (/^\[.+\]$/.test(elem) ||
+                                           /^\(0x[0-9a-f]+\)$/.test(elem)) {
+                                    return elem;
+                                } else {
+                                    return elem +
+                                        ' (not-yet-loaded or missing ' +
+                                        'callchain dictionary)';
+                                }
+                            }).join('\n'));
+                            $('#callchain').html(
+                                $('#callchain').html().replace(/\n/g, '<br />'));
+                            $('#callchain_item').show();
+                        } else {
+                            $('#callchain_item').hide();
+                        }
+
+                        var runtime_select = 0;
+
+                        if ($('#always_ms').prop('checked')) {
+                            runtime_select = 1;
+                        }
+
+                        $('#runtime').html(
+                            tooltip_dict[props.group][runtime_select]);
+
+                        $('#menu_block').css('top', props.pageY);
+                        $('#menu_block').css('left', props.pageX);
+                        $('#menu_block').outerHeight('auto');
+                        $('#menu_block').css('display', 'flex');
 
                         if (sampled_diff_dict[props.group] >
                             1.0 * parseFloat($('#runtime_diff_threshold_input').val()) / 100) {
                             $('#tooltip_sampled_runtime').css('color', 'red');
+                            $('#sampled_diff').html(
+                                (sampled_diff_dict[props.group] * 100).toFixed(2));
+                            $('#runtime_diff_threshold').html(
+                                parseFloat($('#runtime_diff_threshold_input').val()));
+                            $('#runtime_warning').show();
                         } else {
                             $('#tooltip_sampled_runtime').css('color', 'black');
+                            $('#runtime_warning').hide();
                         }
 
-                        var height = $('#callchain_block').outerHeight();
-                        var width = $('#callchain_block').outerWidth();
+                        var height = $('#menu_block').outerHeight();
+                        var width = $('#menu_block').outerWidth();
 
                         if (props.pageY + height > $(window).outerHeight() - 30) {
-                            $('#callchain_block').outerHeight(
+                            $('#menu_block').outerHeight(
                                 $(window).outerHeight() - props.pageY - 30);
                         }
 
                         if (props.pageX + width > $(window).outerWidth() - 20) {
-                            $('#callchain_block').css(
+                            $('#menu_block').css(
                                 'left', props.pageX - width);
                         }
 
@@ -388,6 +454,11 @@ $(document).on('change', '#results_combobox', function() {
             });
     });
 });
+
+function onMenuItemClick(analysis_type) {
+    $('#menu_block').hide();
+    console.log(analysis_type);
+}
 
 function updateFlameGraph(data, always_change_height) {
     if (flamegraph_obj !== undefined) {
@@ -507,13 +578,14 @@ function onAnalysisCheckBoxClick(event) {
     }
 }
 
-function onBackgroundClick() {
-    $('#callchain_block').hide();
-}
+function onBackgroundClick(event) {
+    if (!document.getElementById('menu_block').contains(event.target)) {
+        $('#menu_block').hide();
+    }
 
-function onBlockClick(event) {
-    event.stopPropagation();
-    event.preventDefault();
+    if (!document.getElementById('settings_block').contains(event.target)) {
+        $('#settings_block').hide();
+    }
 }
 
 function onResultCloseClick() {
@@ -724,6 +796,32 @@ function startDrag(event) {
         dragged.style.maxHeight = new_max_height + 'px';
         dragged.style.maxWidth = new_max_width + 'px';
     });
+}
+
+function onSettingsClick(event) {
+    $('#settings_block').css('top', event.clientY);
+    $('#settings_block').css('left', event.clientX);
+    $('#settings_block').show();
+
+    var height = $('#settings_block').outerHeight();
+    var width = $('#settings_block').outerWidth();
+
+    if (event.clientY + height > $(window).outerHeight() - 30) {
+        $('#settings_block').outerHeight(
+            $(window).outerHeight() - props.pageY - 30);
+    }
+
+    if (event.clientX + width > $(window).outerWidth() - 20) {
+        $('#settings_block').css(
+            'left', props.pageX - width);
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+}
+
+function onGeneralAnalysesClick(event) {
+
 }
 
 $(document).ready(function() {
