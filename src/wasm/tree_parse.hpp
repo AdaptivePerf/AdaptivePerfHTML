@@ -15,7 +15,6 @@ struct Sample {
 struct TreeNode {
   std::string name;
   uint64_t value;
-  uint64_t left_sum;
   bool cold;
   std::vector<Sample> samples;
   std::vector<TreeNode> children;

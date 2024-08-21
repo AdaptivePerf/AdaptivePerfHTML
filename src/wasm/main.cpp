@@ -15,8 +15,6 @@ TreeNode parse_json_to_tree(const json &j_node) {
   }
 
   node.cold = j_node.value("cold", false);
-  node.left_sum = 0;
-
 
    if (j_node.contains("samples")) {
     for (const auto &sample : j_node["samples"]) {
@@ -40,7 +38,6 @@ json tree_to_json(const TreeNode &node) {
   json j_node;
   j_node["name"] = node.name;
   j_node["value"] = node.value;
-  j_node["left_sum"] = node.left_sum;
   j_node["cold"] = node.cold;
   j_node["samples"] = json::array();
 
@@ -68,7 +65,7 @@ void save_json_to_file(const json &j, const std::string &filename) {
 void print_tree(const TreeNode &node, int level = 0) {
   std::string indent(level * 2, ' ');
   std::cout << indent << "Name: " << node.name << ", Value: " <<
-    node.value << ", Left Sum: " << node.left_sum << ", Samples  ";
+    node.value << ", Samples  ";
 
   for (const auto &sample : node.samples) {
     std::cout <<"ts: " << sample.timestamp << " val: " << sample.value<<"; ";
@@ -89,7 +86,6 @@ int main() {
   if (j.contains("first_time")) {
 
     start_time = j["first_time"].get<uint64_t>();
-    //start_time = j["first_time"].get<uint64_t>();
   }
 
   std::string counter_tree_key = "walltime";
