@@ -16,7 +16,7 @@ TreeNode parse_json_to_tree(const json &j_node) {
 
   node.cold = j_node.value("cold", false);
 
-   if (j_node.contains("samples")) {
+  if (j_node.contains("samples")) {
     for (const auto &sample : j_node["samples"]) {
       Sample s;
       s.timestamp = sample["timestamp"].get<uint64_t>();
@@ -42,7 +42,8 @@ json tree_to_json(const TreeNode &node) {
   j_node["samples"] = json::array();
 
   for (const auto &sample : node.samples) {
-    j_node["samples"].push_back({{"timestamp", sample.timestamp},{"period", sample.value}});
+    j_node["samples"].push_back({{"timestamp", sample.timestamp},
+                                 {"period", sample.value}});
   }
 
   for (const auto &child : node.children) {
@@ -68,9 +69,11 @@ void print_tree(const TreeNode &node, int level = 0) {
     node.value << ", Samples  ";
 
   for (const auto &sample : node.samples) {
-    std::cout <<"ts: " << sample.timestamp << " val: " << sample.value<<"; ";
+    std::cout << "ts: " << sample.timestamp << " val: " << sample.value << "; ";
   }
-  std::cout<< std::endl;
+
+  std::cout << std::endl;
+
   for (const auto &child : node.children) {
     print_tree(child, level + 1);
   }
@@ -91,9 +94,10 @@ int main() {
   std::string counter_tree_key = "walltime";
 
   if (j.contains(counter_tree_key) && j[counter_tree_key].size() > 1) {
-    TreeNode second_node = parse_json_to_tree(j[counter_tree_key][1]); // time ordered json
+    // time ordered json
+    TreeNode second_node = parse_json_to_tree(j[counter_tree_key][1]);
 
-    std::cout<<"first time "<<start_time<<std::endl;
+    std::cout << "first time " << start_time << std::endl;
     uint64_t threshold_left =  0; // - start_time if needed
     uint64_t threshold_right = 2292600756 + start_time; // - start_time if needed
 

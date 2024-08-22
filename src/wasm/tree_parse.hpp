@@ -6,7 +6,6 @@
 #include <string>
 #include <cstdint>
 
-
 struct Sample {
   uint64_t timestamp;
   uint64_t value;
