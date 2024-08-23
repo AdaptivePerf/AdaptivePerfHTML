@@ -96,14 +96,15 @@ int main() {
   if (j.contains(counter_tree_key) && j[counter_tree_key].size() > 1) {
     // time ordered json
     TreeNode second_node = parse_json_to_tree(j[counter_tree_key][1]);
+    TreeNode first_node = parse_json_to_tree(j[counter_tree_key][0]);
 
     std::cout << "first time " << start_time << std::endl;
     uint64_t threshold_left =  0; // - start_time if needed
-    uint64_t threshold_right = 2292600756 + start_time; // - start_time if needed
+    uint64_t threshold_right = 2292600756000000000 + start_time; // - start_time if needed
 
 
-    TreeNode pruned_tree = prune_tree(second_node, threshold_left,
-                                      threshold_right, counter_tree_key);
+    TreeNode pruned_tree = slice_flame_graph(second_node, threshold_left,
+                                      threshold_right, counter_tree_key, false);
 
     json pruned_tree_json = tree_to_json(pruned_tree);
     save_json_to_file(pruned_tree_json, "pruned_tree.json");
@@ -112,6 +113,9 @@ int main() {
     // between with two thresholds
     std::cout << "\nFull Tree :\n";
     print_tree(second_node);
+
+    std::cout << "\nFull Tree Non-time ordered :\n";
+    print_tree(first_node);
 
     // tree that only includes nodes which overlap with the time period
     // between with two thresholds

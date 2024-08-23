@@ -1,3 +1,5 @@
+#include <unordered_map>
+#include <algorithm>
 #include "tree_parse.hpp"
 
 TreeNode prune_tree(const TreeNode &node, uint64_t threshold_left,
@@ -64,4 +66,47 @@ TreeNode prune_tree(const TreeNode &node, uint64_t threshold_left,
   }
 
   return pruned_node;
+}
+
+
+
+TreeNode merge_nodes(TreeNode& node) {
+    std::unordered_map<std::string, TreeNode> grouped_children;
+
+    for (auto& child : node.children) {
+        TreeNode merged_child = merge_nodes(child);
+
+        if (grouped_children.find(merged_child.name) != grouped_children.end()) {
+            grouped_children[merged_child.name].value += merged_child.value;
+
+            grouped_children[merged_child.name].children.insert(
+                grouped_children[merged_child.name].children.end(),
+                merged_child.children.begin(),
+                merged_child.children.end()
+            );
+        } else {
+            grouped_children[merged_child.name] = merged_child;
+        }
+    }
+
+    node.children.clear();
+    for (auto& entry : grouped_children) {
+        node.children.push_back(entry.second);
+    }
+
+    return node;
+}
+
+TreeNode slice_flame_graph(const TreeNode &node, uint64_t threshold_left,
+                    uint64_t threshold_right, const std::string counter_name, bool time_ordered){
+
+      if(time_ordered){
+         return  prune_tree(node, threshold_left,
+                    threshold_right, counter_name);
+      }
+
+      TreeNode pruned_tree = prune_tree(node, threshold_left,
+                    threshold_right, counter_name);
+      return merge_nodes(pruned_tree);
+          
 }

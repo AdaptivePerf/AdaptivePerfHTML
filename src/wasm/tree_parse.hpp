@@ -19,7 +19,8 @@ struct TreeNode {
   std::vector<TreeNode> children;
 };
 
-TreeNode prune_tree(const TreeNode &node, uint64_t threshold_left,
-                    uint64_t threshold_right, const std::string counter_name);
+TreeNode slice_flame_graph(const TreeNode &node, uint64_t threshold_left,
+                    uint64_t threshold_right, const std::string counter_name, bool time_ordered);
+
 
 #endif // TREE_PARSE_H
