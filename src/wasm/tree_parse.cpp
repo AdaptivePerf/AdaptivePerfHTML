@@ -1,5 +1,4 @@
 #include <unordered_map>
-#include <algorithm>
 #include "tree_parse.hpp"
 
 TreeNode prune_tree(const TreeNode &node, uint64_t threshold_left,
