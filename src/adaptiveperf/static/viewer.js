@@ -9,6 +9,70 @@
 // }
 var window_dict = {};
 
+const flame_graph_window = `
+<div class="window flamegraph_window" onmouseup="onWindowMouseUp()">
+  <div class="window_header">
+    <span class="window_title">Flame graphs</span>
+    <span class="window_close" onmousedown="onWindowCloseMouseDown(event)">
+      <!-- This SVG is from Google Material Icons, originally licensed under
+           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+           (covered by GNU GPL v3 here) -->
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
+           viewBox="0 -960 960 960"
+           width="24px" fill="#ffffff">
+        <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
+      </svg>
+    </span>
+  </div>
+  <div class="flamegraph_box window_content">
+    <span class="collapse_info">
+      Some blocks may be collapsed to speed up rendering, but you can expand
+      them by clicking them.
+    </span>
+    <div class="flamegraph_choice">
+      <div class="flamegraph_metric_choice">
+        Metric:
+        <select name="metric" class="flamegraph_metric" onchange="onMetricChange(event)">
+
+        </select>
+        <input type="checkbox" class="flamegraph_time_ordered"
+         onchange="onTimeOrderedChange(event)">
+        <label class="flamegraph_time_ordered_label">Time-ordered</label>
+      </div>
+      <div class="flamegraph_remainder">
+        <input type="text" class="flamegraph_search"
+               oninput="onSearchQueryChange(this.value)"
+               placeholder="Search..." />
+        <!-- This SVG is from Google Material Icons, originally licensed under
+             Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+             (covered by GNU GPL v3 here) -->
+        <svg class="pointer" xmlns="http://www.w3.org/2000/svg" height="24px"
+             viewBox="0 -960 960 960" width="24px" fill="#000000"
+             onclick="downloadFlameGraph()">
+          <title>Download the current flame graph view as PNG</title>
+          <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
+        </svg>
+      </div>
+    </div>
+    <div class="flamegraph_search_results">
+      <b>Search results:</b> <span class="search_blocks"></span> block(s) accounting for
+      <span class="search_found"></span> unit(s) out of
+      <span class="search_total"></span> (<span class="search_percentage"></span>%)
+    </div>
+    <div class="flamegraph scrollable">
+      <p class="no_flamegraph">
+        There is no flame graph associated with the selected process/thread,
+        metric, and time order (or the flame graph could not be loaded)!
+        This may be caused by the inability of capturing a specific event
+        for that process/thread (it is a disadvantage of sampling-based
+        profiling).
+      </p>
+      <div class="flamegraph_svg"></div>
+    </div>
+  </div>
+</div>
+`;
+
 var flamegraph_obj = undefined;
 var result_obj = undefined;
 var result_cache = {};
@@ -19,6 +83,14 @@ var sampled_diff_dict = {};
 var flamegraph_block_being_resized = false;
 var flamegraph_block_mouse_down = false;
 var flamegraph_total = 0;
+var item_list = [];
+var group_list = [];
+var item_dict = {};
+var callchain_dict = {};
+var metrics_dict = {};
+var tooltip_dict = {};
+var warning_dict = {};
+var general_metrics_dict = {};
 
 function getSymbolFromMap(elem) {
     if (elem in perf_maps_cache) {
@@ -55,7 +127,9 @@ function getSymbolFromMap(elem) {
 }
 
 $(document).on('change', '#results_combobox', function() {
-    $('#please_wait_background').show();
+    $('#settings').hide();
+    $('#block').hide();
+    $('#loading').show();
     $('#results_combobox option:selected').each(function() {
         var value = $(this).val();
         var ajaxPostOptions = {
@@ -69,7 +143,8 @@ $(document).on('change', '#results_combobox', function() {
                                        item_list, group_list,
                                        item_dict, metrics_dict,
                                        callchain_dict, tooltip_dict,
-                                       warning_dict, overall_end_time) {
+                                       warning_dict, overall_end_time,
+                                       general_metrics_dict) {
                 var item = {
                     id: json.id,
                     group: json.id,
@@ -132,12 +207,12 @@ $(document).on('change', '#results_combobox', function() {
                 item_dict[item.id] =
                     [json.name + ' (' + json.pid_tid +
                      '): ' + numf.format(default_runtime) +
-                     ' ' + default_unit + ' <span id="sampled_runtime">(sampled: ~' +
-                     numf.format(default_sampled_time) + ' ' + default_unit + ')</span>',
+                     ' ' + default_unit + ' (sampled: ~' +
+                     numf.format(default_sampled_time) + ' ' + default_unit + ')',
                      json.name + ' (' + json.pid_tid +
                      '): ' + numf.format(json.runtime) +
-                     ' ms <span id="sampled_runtime">(sampled: ~' +
-                     numf.format(json.sampled_time) + ' ms)</span>'];
+                     ' ms (sampled: ~' +
+                     numf.format(json.sampled_time) + ' ms)'];
                 tooltip_dict[item.id] =
                     ['Runtime: ' +
                      numf.format(default_runtime) +
@@ -151,6 +226,10 @@ $(document).on('change', '#results_combobox', function() {
                      numf.format(json.sampled_time) + ' ms)</span>'];
                 metrics_dict[item.id] = json.metrics;
                 warning_dict[item.id] = [warning, sampled_diff];
+
+                if ('general_metrics' in json && $.isEmptyObject(general_metrics_dict)) {
+                    Object.assign(general_metrics_dict, json.general_metrics);
+                }
 
                 if (level > 0) {
                     callchain_dict[item.id] = json.start_callchain;
@@ -190,7 +269,8 @@ $(document).on('change', '#results_combobox', function() {
                                       callchain_dict,
                                       tooltip_dict,
                                       warning_dict,
-                                      overall_end_time);
+                                      overall_end_time,
+                                      general_metrics_dict);
                 }
             }
 
@@ -212,23 +292,29 @@ $(document).on('change', '#results_combobox', function() {
             }
 
             function part3() {
-                var item_list = [];
-                var group_list = [];
-                var item_dict = {};
-                var callchain_dict = {};
-                var metrics_dict = {};
-                var tooltip_dict = {};
-                var warning_dict = {};
+                item_list = [];
+                group_list = [];
+                item_dict = {};
+                callchain_dict = {};
+                metrics_dict = {};
+                tooltip_dict = {};
+                warning_dict = {};
+                general_metrics_dict = {};
                 var overall_end_time = [0];
 
                 from_json_to_item(JSON.parse(result), 0,
                                   item_list, group_list, item_dict,
                                   metrics_dict,
                                   callchain_dict, tooltip_dict,
-                                  warning_dict, overall_end_time);
+                                  warning_dict, overall_end_time,
+                                  general_metrics_dict);
 
                 var container = $('#block')[0];
                 container.innerHTML = '';
+
+                $('#settings').show();
+                $('#block').show();
+                $('#loading').hide();
 
                 var timeline = new vis.Timeline(
                     container,
@@ -253,101 +339,6 @@ $(document).on('change', '#results_combobox', function() {
                         max: 2 * overall_end_time[0]
                     }
                 );
-
-                timeline.on('doubleClick', function (props) {
-                    if (props.group != null) {
-                        $('#please_wait_background').show();
-
-                        var runtime_select = 0;
-
-                        if ($('#always_ms').prop('checked')) {
-                            runtime_select = 1;
-                        }
-
-                        $('#result_title').html(item_dict[props.group][runtime_select]);
-
-                        if (sampled_diff_dict[props.group] >
-                            1.0 * parseFloat($('#runtime_diff_threshold_input').val()) / 100) {
-                            $('#sampled_time_warning').show();
-                            $('#sampled_runtime').css('color', 'red');
-                            $('#sampled_diff').html(
-                                (sampled_diff_dict[props.group] * 100).toFixed(2));
-                            $('#runtime_diff_threshold').html(
-                                parseFloat($('#runtime_diff_threshold_input').val()));
-                        } else {
-                            $('#sampled_runtime').css('color', 'black');
-                            $('#sampled_time_warning').hide();
-                        }
-
-                        $('#metric').empty();
-                        $('#metric').append(new Option('Wall time (ns)',
-                                                       'walltime'));
-
-                        var dict = metrics_dict[props.group];
-                        for (var metric_value in dict) {
-                            $('#metric').append(new Option(dict[metric_value],
-                                                           metric_value));
-                        }
-
-                        $('#metric').val('walltime');
-                        $('#time_ordered').prop('checked', false);
-                        $('#flamegraph').attr('data-id', props.group);
-
-                        if (props.group + '_' +
-                            parseFloat($('#threshold_input').val()) in result_cache) {
-                            result_obj = result_cache[
-                                props.group + '_' + parseFloat($(
-                                    '#threshold_input').val())];
-
-                            if (!('walltime' in result_obj)) {
-                                flamegraph_obj = undefined;
-                                $('#svg').hide();
-                                $('#search').val('');
-                                $('#no_flamegraph').show();
-                                $('#result_background').show();
-                            } else {
-                                openFlameGraph('walltime');
-                            }
-
-                            $('#please_wait_background').hide();
-                        } else {
-                            var pid_tid = props.group.split('_');
-
-                            $.ajax({
-                                url: $('#block').attr('result_id') + '/',
-                                method: 'POST',
-                                dataType: 'json',
-                                data: {pid: pid_tid[0], tid: pid_tid[1],
-                                       threshold: 1.0 * parseFloat($(
-                                           '#threshold_input').val()) / 100}
-                            }).done(ajax_obj => {
-                                result_cache[
-                                    props.group + '_' + parseFloat($(
-                                        '#threshold_input').val())] = ajax_obj;
-                                result_obj = ajax_obj;
-
-                                if (!('walltime' in result_obj)) {
-                                    flamegraph_obj = undefined;
-                                    $('#svg').hide();
-                                    $('#search').val('');
-                                    $('#no_flamegraph').show();
-                                    $('#result_background').show();
-                                } else {
-                                    openFlameGraph('walltime');
-                                }
-
-                                $('#please_wait_background').hide();
-                            }).fail(ajax_obj => {
-                                flamegraph_obj = undefined;
-                                $('#svg').hide();
-                                $('#search').val('');
-                                $('#no_flamegraph').show();
-                                $('#result_background').show();
-                                $('#please_wait_background').hide();
-                            });
-                        }
-                    }
-                });
 
                 timeline.on('contextmenu', function (props) {
                     if (props.group != null) {
@@ -383,6 +374,31 @@ $(document).on('change', '#results_combobox', function() {
                         $('#runtime').html(
                             tooltip_dict[props.group][runtime_select]);
 
+                        $('#menu_items').empty();
+
+                        var flame_graphs_present = false;
+
+                        console.log(metrics_dict[props.group]);
+                        
+                        for (const [k, v] of Object.entries(metrics_dict[props.group])) {
+                            if (v.flame_graph) {
+                                if (!flame_graphs_present) {
+                                    flame_graphs_present = true;
+
+                                    $(`<div class="menu_item"
+                                        onclick="onMenuItemClick('flame_graphs',
+                                        '${props.group}')">
+                                          Flame graphs
+                                       </div>`).appendTo('#menu_items');
+                                }
+                            } else {
+                                $(`<div class="menu_item"
+                                    onclick="onMenuItemClick('${k}', '${props.group}')">
+                                     ${v.title}
+                                   </div>`).appendTo('#menu_items');
+                            }
+                        }
+
                         $('#menu_block').css('top', props.pageY);
                         $('#menu_block').css('left', props.pageX);
                         $('#menu_block').outerHeight('auto');
@@ -417,9 +433,6 @@ $(document).on('change', '#results_combobox', function() {
                         props.event.preventDefault();
                     }
                 });
-
-                $('#settings').show();
-                $('#please_wait_background').hide();
             }
 
             $('#block').attr('result_id', value);
@@ -450,26 +463,118 @@ $(document).on('change', '#results_combobox', function() {
                     alert('Could not load the session! (HTTP code ' +
                           ajax_obj.status + ')');
                 }
-                $('#please_wait_background').hide();
+                $('#loading').hide();
             });
     });
 });
 
-function onMenuItemClick(analysis_type) {
+function onMenuItemClick(analysis_type, timeline_group_id) {
     $('#menu_block').hide();
-    console.log(analysis_type);
+
+    if (analysis_type === 'flame_graphs') {
+        var new_window = $(flame_graph_window);
+        new_window.css('display', 'none');
+        new_window.attr('id', `${analysis_type}_${timeline_group_id}`);
+        new_window.find('.window_header').attr('onmousedown', 'startDrag(event, \'' +
+                                               new_window.attr('id') + '\')');
+        new_window.find('.window_close').attr(
+            'onclick', 'onWindowCloseClick(event, \'' +
+                new_window.attr('id') + '\')');
+        new_window.find('.flamegraph_time_ordered').attr(
+            'id', new_window.attr('id') + '_time_ordered');
+        new_window.find('.flamegraph_time_ordered_label').attr(
+            'for', new_window.find('.flamegraph_time_ordered').attr('id'));
+        
+        new_window.appendTo('body');
+
+        var runtime_select = 0;
+
+        if ($('#always_ms').prop('checked')) {
+            runtime_select = 1;
+        }
+
+        new_window.find('.window_title').html(item_dict[timeline_group_id][runtime_select]);
+
+        new_window.find('.flamegraph_metric').empty();
+        new_window.find('.flamegraph_metric').append(
+            new Option('Wall time (ns)', 'walltime'));
+
+        var dict = metrics_dict[timeline_group_id];
+        for (var metric_value in dict) {
+            new_window.find('.flamegraph_metric').append(
+                new Option(dict[metric_value],
+                           metric_value));
+        }
+
+        new_window.find('.flamegraph_metric').val('walltime');
+        new_window.find('.flamegraph_time_ordered').prop('checked', false);
+        new_window.find('.flamegraph').attr('data-id', timeline_group_id);
+
+        if (timeline_group_id + '_' +
+            parseFloat($('#threshold_input').val()) in result_cache) {
+            result_obj = result_cache[
+                timeline_group_id + '_' + parseFloat($(
+                    '#threshold_input').val())];
+
+            if (!('walltime' in result_obj)) {
+                flamegraph_obj = undefined;
+                new_window.find('.flamegraph_svg').hide();
+                new_window.find('.flamegraph_search').val('');
+                new_window.find('.no_flamegraph').show();
+            } else {
+                openFlameGraph(new_window.attr('id'), 'walltime');
+            }
+        } else {
+            var pid_tid = timeline_group_id.split('_');
+
+            $.ajax({
+                url: $('#block').attr('result_id') + '/',
+                method: 'POST',
+                dataType: 'json',
+                data: {pid: pid_tid[0], tid: pid_tid[1],
+                       threshold: 1.0 * parseFloat($(
+                           '#threshold_input').val()) / 100}
+            }).done(ajax_obj => {
+                result_cache[
+                    timeline_group_id + '_' + parseFloat($(
+                        '#threshold_input').val())] = ajax_obj;
+                result_obj = ajax_obj;
+
+                if (!('walltime' in result_obj)) {
+                    flamegraph_obj = undefined;
+                    new_window.find('.flamegraph_svg').hide();
+                    new_window.find('.flamegraph_search').val('');
+                    new_window.find('.no_flamegraph').show();
+                } else {
+                    openFlameGraph(new_window.attr('id'), 'walltime');
+                }
+
+                new_window.find('.window_loading').hide();
+            }).fail(ajax_obj => {
+                flamegraph_obj = undefined;
+                new_window.find('.flamegraph_svg').hide();
+                new_window.find('.flamegraph_search').val('');
+                new_window.find('.no_flamegraph').show();
+                new_window.find('.window_loading').hide();
+            });
+        }
+
+        new_window.show();
+        new ResizeObserver(onFlameGraphBlockResize).observe(new_window[0]);
+    }
 }
 
-function updateFlameGraph(data, always_change_height) {
+function updateFlameGraph(window_id, data, always_change_height) {
+    var window_obj = $('#' + window_id);
     if (flamegraph_obj !== undefined) {
         var update_height = function() {
-            var flamegraph_svg = $('#svg').children()[0];
+            var flamegraph_svg = window_obj.find('.flamegraph_svg').children()[0];
 
             if (flamegraph_svg !== undefined) {
                 var target_height = flamegraph_svg.getBBox().height;
 
-                if (always_change_height || target_height > $('#svg').height()) {
-                    $('#svg').height(target_height);
+                if (always_change_height || target_height > window_obj.find('.flamegraph_svg').height()) {
+                    window_obj.find('.flamegraph_svg').height(target_height);
                     flamegraph_svg.setAttribute('height', target_height);
                 }
             }
@@ -484,10 +589,11 @@ function updateFlameGraph(data, always_change_height) {
     }
 }
 
-function openFlameGraph(metric) {
+function openFlameGraph(window_id, metric) {
+    var window_obj = $('#' + window_id);
     flamegraph_obj = flamegraph();
     flamegraph_obj.inverted(true);
-    flamegraph_obj.sort($('#time_ordered').prop('checked') ? false : true);
+    flamegraph_obj.sort(window_obj.find('.flamegraph_time_ordered').prop('checked') ? false : true);
     flamegraph_obj.color(function(node, original_color) {
         if (node.highlight) {
             return original_color;
@@ -500,8 +606,8 @@ function openFlameGraph(metric) {
         }
     });
     flamegraph_obj.getName(function(node) {
-        if (node.data.name in callchain_obj[$('#metric').val()]) {
-            return callchain_obj[$('#metric').val()][node.data.name];
+        if (node.data.name in callchain_obj[window_obj.find('.flamegraph_metric').val()]) {
+            return callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
         } else if (/^\(0x[0-9a-f]+;.+\)$/.test(node.data.name)) {
             return getSymbolFromMap(node.data.name);
         } else {
@@ -525,14 +631,14 @@ function openFlameGraph(metric) {
             }
 
             parent.children = new_children;
-            updateFlameGraph(d3.select('#svg').datum().data, false);
+            updateFlameGraph(window_id, d3.select('#svg').datum().data, false);
         }
     });
     flamegraph_obj.setSearchHandler(function(results, sum, total) {
-        $('#search_blocks').html(results.length.toLocaleString());
-        $('#search_found').html(sum.toLocaleString());
-        $('#search_total').html(flamegraph_total.toLocaleString());
-        $('#search_percentage').html((1.0 * sum / flamegraph_total * 100).toFixed(2));
+        window_obj.find('.flamegraph_search_blocks').html(results.length.toLocaleString());
+        window_obj.find('.flamegraph_search_found').html(sum.toLocaleString());
+        window_obj.find('.flamegraph_search_total').html(flamegraph_total.toLocaleString());
+        window_obj.find('.flamegraph_search_percentage').html((1.0 * sum / flamegraph_total * 100).toFixed(2));
     });
 
     if (metric === 'walltime') {
@@ -541,30 +647,28 @@ function openFlameGraph(metric) {
         flamegraph_obj.setColorHue('green');
     }
 
-    $('#no_flamegraph').hide();
-    $('#svg').html('');
-    $('#search').val('');
-    $('#search_results').hide();
-    $('#flamegraph_window').show();
-    $('#svg').show();
-    $('#result_background').show();
+    window_obj.find('.no_flamegraph').hide();
+    window_obj.find('.flamegraph_svg').html('');
+    window_obj.find('.flamegraph_search').val('');
+    window_obj.find('.flamegraph_search_results').hide();
+    window_obj.find('.flamegraph_svg').attr(
+        'id', window_obj.attr('id') + '_flamegraph_svg');                                    
+    window_obj.find('.flamegraph_svg').show();
     flamegraph_obj.width($('#result_block').width());
-    d3.select('#svg').datum(structuredClone(
+    d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum(structuredClone(
         result_obj[metric][
-            $('#time_ordered').prop('checked') ? 1 : 0])).call(
+            window_obj.find('.flamegraph_time_ordered').prop('checked') ? 1 : 0])).call(
                 flamegraph_obj);
-    flamegraph_total = d3.select('#svg').datum().data['value'];
-    updateFlameGraph(null, true);
-    flamegraph_obj.width($('#svg').width());
+    flamegraph_total = d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum().data['value'];
+    updateFlameGraph(window_id, null, true);
+    flamegraph_obj.width(window_obj.find('.flamegraph_svg').width());
     flamegraph_obj.update();
 
-    var pos = $('#flamegraph_window').position();
-    $('#flamegraph_window').css('max-height', ($('#result_area').height() - pos.top) + 'px');
-    $('#flamegraph_window').css('max-width', ($('#result_area').width() - pos.left) + 'px');
+    var pos = window_obj.position();
+    window_obj.css('max-height', ($(window).outerHeight() - pos.top) + 'px');
+    window_obj.css('max-width', ($(window).outerWidth() - pos.left) + 'px');
 
-    $('.window').hide();
-    $('.analysis_type').prop('checked', false);
-    $('#flamegraph')[0].scrollTop = 0;
+    window_obj.find('.flamegraph')[0].scrollTop = 0;
 }
 
 function onAnalysisCheckBoxClick(event) {
@@ -593,15 +697,13 @@ function onResultCloseClick() {
     $('#result_background').hide();
 }
 
-function onWindowCloseClick(event) {
-    var target = event.target;
+function onWindowCloseMouseDown(event) {
+    event.stopPropagation();
+    event.preventDefault();
+}
 
-    while (!target.classList.contains('window')) {
-        target = target.parentElement;
-    }
-
-    $(target).hide();
-    $('#' + target.id.replace('_window', '_checkbox')).prop('checked', false);
+function onWindowCloseClick(event, window_id) {
+    $('#' + window_id).remove();
 }
 
 function onMetricChange(event) {
@@ -623,53 +725,51 @@ function onMetricChange(event) {
     }
 }
 
-function onTimeOrderedChange(event) {
+function onTimeOrderedChange(window_id, event) {
+    var window_obj = $('#' + window_id);
     if (flamegraph_obj !== undefined) {
         flamegraph_obj.sort(!event.currentTarget.checked);
-        updateFlameGraph(structuredClone(
+        updateFlameGraph(window_id, structuredClone(
             result_obj[$('#metric').val()][
                 event.currentTarget.checked ? 1 : 0]), true);
 
-        $('#search').val('');
-        $('#search_results').hide();
+        window_obj.find('.flamegraph_search').val('');
+        window_obj.find('.flamegraph_search_results').hide();
     }
 }
 
-function onSearchQueryChange(value) {
+function onSearchQueryChange(window_id, value) {
+    var window_obj = $('#' + window_id);
     if (flamegraph_obj !== undefined) {
         if (value === undefined || value === "") {
-            $('#search_results').hide();
+            window_obj.find('.flamegraph_search_results').hide();
         } else {
-            $('#search_results').show();
+            window_obj.find('.flamegraph_search_results').show();
         }
 
         flamegraph_obj.search(value);
     }
 }
 
-function onFlameGraphBlockMouseDown() {
-    flamegraph_block_mouse_down = true;
-}
-
-function onFlameGraphBlockMouseUp() {
-    flamegraph_block_mouse_down = false;
-
+function onWindowMouseUp(window_id) {
+    var window_obj = $('#' + window_id);
     if (flamegraph_block_being_resized) {
-        flamegraph_obj.width($('#svg').width());
+        flamegraph_obj.width(window_obj.find('.flamegraph_svg').width());
         flamegraph_obj.update();
         flamegraph_block_being_resized = false;
     }
 }
 
 function onFlameGraphBlockResize() {
-    if (flamegraph_obj !== undefined && flamegraph_block_mouse_down) {
+    if (flamegraph_obj !== undefined) {
         flamegraph_block_being_resized = true;
     }
 }
 
 // downloadFlameGraph() is based on https://stackoverflow.com/a/28226736
 // (originally CC BY-SA 4.0, covered by GNU GPL v3 here)
-function downloadFlameGraph() {
+function downloadFlameGraph(window_id) {
+    var window_obj = $('#' + window_id);
     var filename = window.prompt(
         'What filename do you want? ' +
             '(".png" will be added automatically)');
@@ -678,9 +778,7 @@ function downloadFlameGraph() {
         return;
     }
 
-    $('#please_wait_background').show();
-
-    var svg = $('#svg').children()[0].cloneNode(true);
+    var svg = window_obj.find('.flamegraph_svg').children()[0].cloneNode(true);
     var style = document.createElement('style');
 
     style.innerHTML = $('#viewer_script').attr('data-d3-flamegraph-css');
@@ -708,13 +806,10 @@ function downloadFlameGraph() {
             event.stopPropagation();
         });
         a.click();
-
-        $('#please_wait_background').hide();
     };
     image.onerror = function() {
         window.alert("Could not download the flame graph because " +
                      "of an error!");
-        $('#please_wait_background').hide();
     };
     image.width = svg.width.baseVal.value;
     image.height = svg.height.baseVal.value;
@@ -753,27 +848,26 @@ function insertValidPercentage(input) {
     }
 }
 
-function startDrag(event) {
+function startDrag(event, window_id) {
     event.stopPropagation();
     event.preventDefault();
 
-    var dragged = event.target.parentElement;
+    var dragged = document.getElementById(window_id);
     var startX = event.offsetX;
     var startY = event.offsetY;
-    var rect = $('#result_area').offset();
 
     $('body').mousemove(function(event) {
         event.stopPropagation();
         event.preventDefault();
-        var newX = event.pageX - rect.left - startX;
-        var newY = event.pageY - rect.top - startY;
+        var newX = event.pageX - startX;
+        var newY = event.pageY - startY;
         var dragged_rect = dragged.getBoundingClientRect();
 
-        if (newX >= 0 && newX + dragged_rect.width <= $('#result_area').width()) {
+        if (newX >= 0 && newX + dragged_rect.width <= $(window).outerWidth()) {
             dragged.style.left = newX + 'px';
         }
 
-        if (newY >= 0 && newY + dragged_rect.height <= $('#result_area').height()) {
+        if (newY >= 0 && newY + dragged_rect.height <= $(window).outerHeight()) {
             dragged.style.top = newY + 'px';
         }
     });
@@ -781,20 +875,6 @@ function startDrag(event) {
     $('body').mouseup(function(event) {
         $('body').off('mousemove');
         $('body').off('mouseup');
-
-        var new_max_height = $('#result_area').height() - dragged.offsetTop;
-        var new_max_width = $('#result_area').width() - dragged.offsetLeft;
-
-        if (parseFloat(dragged.style.width) > parseFloat(dragged.style.maxWidth)) {
-            dragged.style.width = dragged.style.maxWidth;
-        }
-
-        if (parseFloat(dragged.style.height) > parseFloat(dragged.style.maxHeight)) {
-            dragged.style.height = dragged.style.maxHeight;
-        }
-
-        dragged.style.maxHeight = new_max_height + 'px';
-        dragged.style.maxWidth = new_max_width + 'px';
     });
 }
 
@@ -823,7 +903,3 @@ function onSettingsClick(event) {
 function onGeneralAnalysesClick(event) {
 
 }
-
-$(document).ready(function() {
-    new ResizeObserver(onFlameGraphBlockResize).observe($('#flamegraph_window')[0]);
-});

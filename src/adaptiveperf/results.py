@@ -183,13 +183,23 @@ class ProfilingResults:
 
         metrics_path = self._path / 'out' / 'event_dict.data'
 
-        self._metrics = {}
+        self._metrics = {
+            'walltime': {
+                'title': 'Wall time (ns)',
+                'flame_graph': True
+            }
+        }
 
         if metrics_path.exists():
             with metrics_path.open(mode='r') as f:
                 for line in f:
                     match = re.search(r'^(\S+) (.+)$',  line.strip())
-                    self._metrics[match.group(1)] = match.group(2)
+                    self._metrics[match.group(1)] = {
+                        'title': match.group(2),
+                        'flame_graph': True
+                    }
+
+        self._general_metrics = {}
 
     def get_flame_graph(self, pid, tid, compress_threshold):
         """
@@ -416,18 +426,24 @@ class ProfilingResults:
           start time of an off-CPU interval and b is the length of such
           interval.
         * "start_callchain": the callchain spawning the thread/process.
-        * "metrics": the JSON object mapping extra profiling metrics (in
-          addition to on-CPU/off-CPU activity) to their website titles (e.g.
-          "page-faults" -> "Page faults"). It can be empty.
+        * "metrics": the JSON object mapping extra per-thread profiling metrics
+          (in addition to on-CPU/off-CPU activity) to their website titles
+          and their type (i.e. flame-graph-related or not flame-graph-related).
+          An example object is {"page-faults": {"title": "Page faults",
+          "flame_graph": true}}. The structure can also be empty.
+        * "general_metrics": the JSON object mapping general profiling
+          metrics to their website titles (e.g. "roofline" ->
+          "Roofline model"). This is set only for the root and it can be empty.
         * "children": the list of all threads/processes spawned by the
-          thread/process. Each element has the same structure as the root.
+          thread/process. Each element has the same structure as the root
+          except for "general_metrics" which is absent.
         """
         def to_ms(num):
             return None if num is None else num / 1000000
 
         tree = self.get_thread_tree()
 
-        def node_to_dict(node):
+        def node_to_dict(node, is_root):
             process_name, pid_tid, start_time, runtime = node.tag
             pid_tid_code = pid_tid.replace('/', '_')
 
@@ -461,18 +477,23 @@ class ProfilingResults:
                 'children': []
             }
 
+            if is_root:
+                to_return['general_metrics'] = self._general_metrics
+
             children = tree.children(node.identifier)
 
             if len(children) > 0:
                 for child in children:
-                    to_return['children'].append(node_to_dict(child))
+                    to_return['children'].append(node_to_dict(child,
+                                                              False))
 
             return to_return
 
         if tree.root is None:
             return json.dumps({})
         else:
-            return json.dumps(node_to_dict(tree.get_node(tree.root)))
+            return json.dumps(node_to_dict(tree.get_node(tree.root),
+                                           True))
 
     def get_perf_maps(self):
         """
