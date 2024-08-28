@@ -1,11 +1,8 @@
 
 #include "tree_parse.hpp"
-#
-#include <iostream>
 #include <vector>
 #include <string>
 #include <unordered_map>
-#include <stack>
 
 TreeNode prune_tree(const TreeNode &node, uint64_t threshold_left,
                     uint64_t threshold_right, const std::string counter_name) {
@@ -86,17 +83,14 @@ void mergeNodes(TreeNode &target, const TreeNode &source) {
 void mergeTree(TreeNode &root) {
     std::unordered_map<std::string, TreeNode> mergedChildren;
 
-    for (auto &child : root.children) {
-        if (mergedChildren.find(child.name) != mergedChildren.end()) {
-            mergeNodes(mergedChildren[child.name], child);
+    for (auto it = root.children.begin(); it != root.children.end(); ) {
+        if (mergedChildren.find(it->name) != mergedChildren.end()) {
+            mergeNodes(mergedChildren[it->name], *it);
+            it = root.children.erase(it); 
         } else {
-            mergedChildren[child.name] = child;
+            mergedChildren[it->name] = *it;
+            ++it; 
         }
-    }
-
-    root.children.clear();
-    for (auto &entry : mergedChildren) {
-        root.children.push_back(entry.second);
     }
 
     for (auto &child : root.children) {
@@ -110,11 +104,8 @@ TreeNode slice_flame_graph(const TreeNode &node, uint64_t threshold_left,
       TreeNode pruned_tree = prune_tree(node, threshold_left,
                     threshold_right, counter_name);
 
-      if(time_ordered){
-         return pruned_tree;
+      if(!time_ordered){
+         mergeTree(pruned_tree);
       }
-
-      mergeTree(pruned_tree);
-      return pruned_tree;
-          
+      return pruned_tree;     
 }
