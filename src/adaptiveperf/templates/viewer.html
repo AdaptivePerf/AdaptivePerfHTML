@@ -25,17 +25,13 @@
             src="{{ url_for('static', filename='viewer.js') }}"></script>
     <style type="text/css">
       html, body {
-          height:100%;
-      }
-
-      body {
           font-family:Arial;
           background-color:grey;
           display:flex;
           align-items:center;
           justify-content:center;
           height:100%;
-          overflow:hidden;
+          overflow:auto;
       }
 
       #block {
@@ -55,7 +51,7 @@
       }
 
       .scrollable {
-          overflow-y:scroll;
+          overflow-y:auto;
       }
 
       object {
@@ -73,7 +69,7 @@
           margin-bottom:10px;
       }
 
-      #result_background, #please_wait_background {
+      #result_background {
           display:none;
           position:fixed;
           top: 0;
@@ -86,22 +82,34 @@
 
       #callchain {
           font-size:14px;
-          overflow:scroll;
+          overflow:auto;
           flex-grow:1;
           white-space:nowrap;
+          margin-top:5px;
+          /* Based on https://meta.stackexchange.com/q/364048 */
+          /* (originally CC BY-SA 4.0, covered by GNU GPL v3 here) */
+          font-family:ui-monospace,
+                      Cascadia Mono,
+                      Segoe UI Mono,
+                      Ubuntu Mono,
+                      Roboto Mono,
+                      Menlo,
+                      Monaco,
+                      Consolas,
+                      monospace;
       }
 
-      #menu_block {
+      .menu_block {
           position:fixed;
           background-color:white;
           display:none;
           flex-direction:column;
           max-width:50vw;
           box-shadow:3px 3px 10px;
-          overflow-y:scroll;
+          overflow-y:auto;
       }
 
-      #runtime_item {
+      .header_item {
           background-color:#BBBBBB;
           padding:5px;
           cursor:default;
@@ -142,111 +150,59 @@
           background-color:#DDDDDD;
       }
 
-      #result_block {
-          position:fixed;
-          min-height:400px;
-          min-width:1050px;
-          max-height:90vh;
-          max-width:90vw;
-          height:70vh;
-          width:70vw;
-          resize:both;
-          overflow:hidden;
-          border-radius:10px;
-          padding:10px;
-          background-color:white;
-          top:50%;
-          left:50%;
-          display:flex;
-          flex-direction:column;
-          transform:translate(-50%, -50%);
-      }
-
-      #please_wait_block {
-          position:fixed;
-          padding:10px;
-          border-radius:10px;
-          background-color:white;
-          top:50%;
-          left:50%;
-          transform:translate(-50%, -50%);
-          text-align:center;
-      }
-
-      #callchain {
-          margin-top:5px;
-          /* Based on https://meta.stackexchange.com/q/364048 */
-          /* (originally CC BY-SA 4.0, covered by GNU GPL v3 here) */
-          font-family:ui-monospace,
-                      Cascadia Mono,
-                      Segoe UI Mono,
-                      Ubuntu Mono,
-                      Roboto Mono,
-                      Menlo,
-                      Monaco,
-                      Consolas,
-                      monospace;
-      }
-
-      #result_title {
-          width:100%;
-          text-align:center;
-          margin-top:10px;
-          margin-left:10px;
-          margin-right:10px;
-          margin-bottom:20px;
-      }
-
-      #flamegraph_box {
+      .flamegraph_box {
           overflow:hidden;
           display:flex;
           flex-direction:column;
           flex-grow:1;
       }
 
-      #flamegraph_choice {
+      .flamegraph_choice {
           display:flex;
           flex-direction:row;
           width:100%;
           margin-bottom:10px;
       }
 
-      #remainder {
+      .flamegraph_remainder {
           flex-grow:1;
           display:flex;
           align-items:center;
           margin-right:5px;
       }
 
-      #flamegraph {
+      .flamegraph {
           flex-grow:1;
           overflow-x:hidden;
       }
 
-      #metric_choice {
+      .flamegraph_metric_choice {
           margin-left:5px;
           margin-right:100px;
           display:flex;
           align-items:center;
       }
 
-      #search {
+      .flamegraph_search {
           flex-grow:1;
           margin-right:5px;
       }
 
-      #download {
+      .pointer {
           cursor:pointer;
       }
 
-      #metric {
+      .flamegraph_metric {
           max-width:250px;
           margin-left:5px;
           margin-right:5px;
       }
 
-      #no_flamegraph {
+      .no_flamegraph {
           display:none;
+          text-align:center;
+          margin-left:5px;
+          margin-right:5px;
       }
 
       #settings {
@@ -257,17 +213,11 @@
           width:100px;
       }
 
-      #search_results {
+      .flamegraph_search_results {
           text-align:center;
           font-style:italic;
           margin-bottom:10px;
           display:none;
-      }
-
-      #result_box {
-          display:flex;
-          flex-direction:row;
-          flex-grow:1;
       }
 
       #analysis {
@@ -275,24 +225,18 @@
           margin-right:10px;
       }
 
-      #result_parent_area {
-          flex-grow:1;
-          background-color:grey;
-          display:flex;
-      }
-
-      #result_area {
-          flex-grow:1;
-          background-color:grey;
-          margin:15px;
-          position:relative;
-      }
-
-      #flamegraph_window {
+      .flamegraph_window {
           min-width:750px;
           width:750px;
           min-height:200px;
           height:300px;
+      }
+
+      .roofline_window {
+          min-width:750px;
+          width:750px;
+          min-height:550px;
+          height:550px;
       }
 
       .window {
@@ -310,6 +254,7 @@
       .window_header {
           background-color:black;
           color:white;
+          fill:white;
           padding:5px;
           cursor:grab;
       }
@@ -345,7 +290,7 @@
           height:100%;
       }
 
-      .window_close {
+      .window_visibility, .window_close {
           float:right;
           display:flex;
           align-items:center;
@@ -359,7 +304,7 @@
           top:5px;
       }
 
-      #collapse_info {
+      .collapse_info {
           font-style:italic;
           text-align:center;
           margin-top:5px;
@@ -372,7 +317,7 @@
           background-color:white;
           max-width:50vw;
           box-shadow:3px 3px 10px;
-          overflow-y:scroll;
+          overflow-y:auto;
           padding:10px;
       }
 
@@ -384,14 +329,94 @@
       .margin_bottom {
           margin-bottom:10px;
       }
+
+      #loading {
+          display:none;
+      }
+
+      .loading {
+          text-align:center;
+          margin:5px;
+      }
+
+      .roofline_box {
+          display:flex;
+          flex-direction:row;
+          flex-grow:1;
+      }
+
+      .roofline_content {
+          flex-grow:1;
+          display:flex;
+          flex-direction:column;
+      }
+
+      .roofline_settings {
+          display:flex;
+          width:200px;
+          min-width:200px;
+          flex-direction:column;
+          margin-right:10px;
+      }
+
+      .roofline_type, .roofline_bounds {
+          margin-bottom:5px;
+      }
+
+      .roofline_type_select {
+          width:100%;
+      }
+
+      .roofline_details {
+          flex-grow:1;
+      }
+
+      .roofline {
+          flex-grow:1;
+      }
+
+      .roofline_l1 {
+          background-color:darkred;
+          color:white;
+          padding:2px;
+          margin-bottom:5px;
+          cursor:pointer;
+      }
+
+      .roofline_l2 {
+          background-color:darkgreen;
+          color:white;
+          padding:2px;
+          margin-bottom:5px;
+          cursor:pointer;
+      }
+
+      .roofline_l3 {
+          background-color:darkblue;
+          color:white;
+          padding:2px;
+          margin-bottom:5px;
+          cursor:pointer;
+      }
+
+      .roofline_dram {
+          background-color:darkgrey;
+          color:white;
+          padding:2px;
+          margin-bottom:5px;
+          cursor:pointer;
+      }
+
+      .roofline_fp {
+          background-color:black;
+          color:white;
+          padding:2px;
+          margin-bottom:5px;
+          cursor:pointer;
+      }
     </style>
   </head>
   <body onclick="onBackgroundClick(event)">
-    <div id="please_wait_background">
-      <div id="please_wait_block">
-        <h1>Please wait...</h1>
-      </div>
-    </div>
     <div id="main">
       <div id="header">
         <h1>AdaptivePerf results</h1>
@@ -403,9 +428,13 @@
             Please select a profiling session...
           </option>
           {% for x in ids %}
-          <option value="{{ x.value }}">{{ x }}</option>
+          <option value="{{ x.value }}" data-label="{{ x.label }}">{{ x }}</option>
           {% endfor %}
         </select>
+        <div id="loading">
+          <img src="{{ url_for('static', filename='loading.svg') }}"
+               alt="Please wait..." title="Please wait..." />
+        </div>
         <div id="settings">
           <!-- The two SVGs below are from Google Material Icons, originally
                licensed under Apache License 2.0:
@@ -413,20 +442,20 @@
                (covered by GNU GPL v3 here) -->
           <svg xmlns="http://www.w3.org/2000/svg" height="32px"
                viewBox="0 -960 960 960" width="32px" fill="#000000"
-               onclick="onSettingsClick(event)" style="cursor:pointer">
+               onclick="onSettingsClick(event)" class="pointer">
             <title>Settings</title>
             <path d="m388-80-20-126q-19-7-40-19t-37-25l-118 54-93-164 108-79q-2-9-2.5-20.5T185-480q0-9 .5-20.5T188-521L80-600l93-164 118 54q16-13 37-25t40-18l20-127h184l20 126q19 7 40.5 18.5T669-710l118-54 93 164-108 77q2 10 2.5 21.5t.5 21.5q0 10-.5 21t-2.5 21l108 78-93 164-118-54q-16 13-36.5 25.5T592-206L572-80H388Zm48-60h88l14-112q33-8 62.5-25t53.5-41l106 46 40-72-94-69q4-17 6.5-33.5T715-480q0-17-2-33.5t-7-33.5l94-69-40-72-106 46q-23-26-52-43.5T538-708l-14-112h-88l-14 112q-34 7-63.5 24T306-642l-106-46-40 72 94 69q-4 17-6.5 33.5T245-480q0 17 2.5 33.5T254-413l-94 69 40 72 106-46q24 24 53.5 41t62.5 25l14 112Zm44-210q54 0 92-38t38-92q0-54-38-92t-92-38q-54 0-92 38t-38 92q0 54 38 92t92 38Zm0-130Z"/>
           </svg>
           <svg xmlns="http://www.w3.org/2000/svg" height="32px"
                viewBox="0 -960 960 960" width="32px" fill="#000000"
-               onclick="onGeneralAnalysesClick(event)" style="cursor:pointer">
+               onclick="onGeneralAnalysesClick(event)" class="pointer">
             <title>General analyses</title>
             <path d="M282.67-278h66.66v-203.33h-66.66V-278Zm328 0h66.66v-413.33h-66.66V-278Zm-164 0h66.66v-118.67h-66.66V-278Zm0-203.33h66.66V-548h-66.66v66.67ZM186.67-120q-27 0-46.84-19.83Q120-159.67 120-186.67v-586.66q0-27 19.83-46.84Q159.67-840 186.67-840h586.66q27 0 46.84 19.83Q840-800.33 840-773.33v586.66q0 27-19.83 46.84Q800.33-120 773.33-120H186.67Zm0-66.67h586.66v-586.66H186.67v586.66Zm0-586.66v586.66-586.66Z"/>
           </svg>
           <div id="glossary">
-            <font color="#aa0000">Red parts</font> are on-CPU and
-            <font color="#0294e3">blue parts</font> are off-CPU. Right-click
-            any thread/process to open the details menu.
+            <b><font color="#aa0000">Red parts</font></b> are on-CPU and
+            <b><font color="#0294e3">blue parts</font></b> are off-CPU. <b>Right
+            click</b> any thread/process to open the details menu.
           </div>
         </div>
       </div>
@@ -455,8 +484,8 @@
         <label for="always_ms">Always display runtimes in milliseconds</label>
       </div>
     </div>
-    <div id="menu_block">
-      <div id="runtime_item">
+    <div id="thread_menu_block" class="menu_block">
+      <div class="header_item">
         <span id="runtime"></span>
         <!-- This SVG is from Google Material Icons, originally licensed under
              Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
@@ -469,108 +498,20 @@
           <path d="m40-120 440-760 440 760H40Zm138-80h604L480-720 178-200Zm302-40q17 0 28.5-11.5T520-280q0-17-11.5-28.5T480-320q-17 0-28.5 11.5T440-280q0 17 11.5 28.5T480-240Zm-40-120h80v-200h-80v200Zm40-100Z"/>
         </svg>
       </div>
-      <div id="menu_items">
-        <div class="menu_item"
-             onclick="onMenuItemClick('flame_graphs')">
-          Flame graphs
-        </div>
+      <div id="thread_menu_items">
+
       </div>
       <div id="callchain_item">
         Spawned by:
         <div id="callchain"></div>
       </div>
     </div>
-    <div id="result_background" onclick="onBackgroundClick()">
-      <div id="result_block"
-           onmousedown="onFlameGraphBlockMouseDown()"
-           onmouseup="onFlameGraphBlockMouseUp()">
-        <div id="result_header">
-          <!-- This SVG is from Google Material Icons, originally licensed under
-               Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-               (covered by GNU GPL v3 here) -->
-          <svg xmlns="http://www.w3.org/2000/svg" id="result_close"
-               height="24px"
-               viewBox="0 -960 960 960"
-               width="24px" fill="#000000" onclick="onResultCloseClick()">
-            <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
-          </svg>
-          <h2 id="result_title"></h2>
-          <p style="text-align: center; color:red" id="sampled_time_warning">
+    <div id="general_analysis_menu_block" class="menu_block">
+      <div class="header_item">
+        General analyses
+      </div>
+      <div id="general_analysis_menu_items">
 
-          </p>
-        </div>
-        <div id="result_box">
-          <fieldset id="analysis">
-            <legend><b>Analysis types</b></legend>
-            <input type="checkbox" class="analysis_type" value="flamegraph"
-                   id="flamegraph_checkbox"
-                   onclick="onAnalysisCheckBoxClick(event)" />
-            <label for="flamegraph_checkbox">Flame graphs</label>
-          </fieldset>
-          <div id="result_parent_area">
-            <div id="result_area">
-              <div id="flamegraph_window" class="window">
-                <div class="window_header" onmousedown="startDrag(event)">
-                  <span class="window_title">Flame graphs</span>
-                  <span class="window_close">
-                    <!-- This SVG is from Google Material Icons, originally licensed under
-                         Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-                         (covered by GNU GPL v3 here) -->
-                    <svg xmlns="http://www.w3.org/2000/svg" height="24px"
-                         viewBox="0 -960 960 960"
-                         width="24px" fill="#ffffff" onclick="onWindowCloseClick(event)">
-                      <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
-                    </svg>
-                </div>
-                <div id="flamegraph_box" class="window_content">
-                  <span id="collapse_info">
-                    Some blocks may be collapsed to speed up rendering, but you can expand
-                    them by clicking them.
-                  </span>
-                  <div id="flamegraph_choice">
-                    <div id="metric_choice">
-                      Metric:
-                      <select name="metric" id="metric" onchange="onMetricChange(event)">
-
-                      </select>
-                      <input type="checkbox" id="time_ordered"
-                             name="time_ordered" onchange="onTimeOrderedChange(event)">
-                      <label for="time_ordered">Time-ordered</label>
-                    </div>
-                    <div id="remainder">
-                      <input type="text" id="search" name="search_query"
-                             oninput="onSearchQueryChange(this.value)"
-                             placeholder="Search..." />
-                      <!-- This SVG is from Google Material Icons, originally licensed under
-                           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-                           (covered by GNU GPL v3 here) -->
-                      <svg id="download" xmlns="http://www.w3.org/2000/svg" height="24px"
-                           viewBox="0 -960 960 960" width="24px" fill="#000000"
-                           onclick="downloadFlameGraph()">
-                        <title>Download the current flame graph view as PNG</title>
-                        <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div id="search_results">
-                    <b>Search results:</b> <span id="search_blocks"></span> block(s) accounting for
-                    <span id="search_found"></span> unit(s) out of
-                    <span id="search_total"></span> (<span id="search_percentage"></span>%)
-                  </div>
-                  <div id="flamegraph" class="scrollable">
-                    <p id="no_flamegraph">
-                      There is no flame graph associated with the selected process/thread,
-                      metric, and time order (or the flame graph could not be loaded)!
-                      This may be caused by the inability of capturing a specific event
-                      for that process/thread (it is a disadvantage of sampling-based
-                      profiling).
-                    </p>
-                    <div id="svg"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
       </div>
     </div>
   </body>
