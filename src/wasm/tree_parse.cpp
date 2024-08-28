@@ -1,5 +1,11 @@
-#include <unordered_map>
+
 #include "tree_parse.hpp"
+#
+#include <iostream>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <stack>
 
 TreeNode prune_tree(const TreeNode &node, uint64_t threshold_left,
                     uint64_t threshold_right, const std::string counter_name) {
@@ -69,43 +75,45 @@ TreeNode prune_tree(const TreeNode &node, uint64_t threshold_left,
 
 
 
-TreeNode merge_nodes(TreeNode& node) {
-    std::unordered_map<std::string, TreeNode> grouped_children;
+void mergeNodes(TreeNode &target, const TreeNode &source) {
+    target.value += source.value;
+    target.samples.insert(target.samples.end(), source.samples.begin(), source.samples.end());
+    target.children.insert(target.children.end(), source.children.begin(), source.children.end());
+}
 
-    for (auto& child : node.children) {
-        TreeNode merged_child = merge_nodes(child);
 
-        if (grouped_children.find(merged_child.name) != grouped_children.end()) {
-            grouped_children[merged_child.name].value += merged_child.value;
+void mergeTree(TreeNode &root) {
+    std::unordered_map<std::string, TreeNode> mergedChildren;
 
-            grouped_children[merged_child.name].children.insert(
-                grouped_children[merged_child.name].children.end(),
-                merged_child.children.begin(),
-                merged_child.children.end()
-            );
+    for (auto &child : root.children) {
+        if (mergedChildren.find(child.name) != mergedChildren.end()) {
+            mergeNodes(mergedChildren[child.name], child);
         } else {
-            grouped_children[merged_child.name] = merged_child;
+            mergedChildren[child.name] = child;
         }
     }
 
-    node.children.clear();
-    for (auto& entry : grouped_children) {
-        node.children.push_back(entry.second);
+    root.children.clear();
+    for (auto &entry : mergedChildren) {
+        root.children.push_back(entry.second);
     }
 
-    return node;
+    for (auto &child : root.children) {
+        mergeTree(child);
+    }
 }
 
 TreeNode slice_flame_graph(const TreeNode &node, uint64_t threshold_left,
                     uint64_t threshold_right, const std::string counter_name, bool time_ordered){
 
-      if(time_ordered){
-         return  prune_tree(node, threshold_left,
-                    threshold_right, counter_name);
-      }
-
       TreeNode pruned_tree = prune_tree(node, threshold_left,
                     threshold_right, counter_name);
-      return merge_nodes(pruned_tree);
+
+      if(time_ordered){
+         return  pruned_tree;
+      }
+
+      mergeTree(pruned_tree);
+      return pruned_tree;
           
 }

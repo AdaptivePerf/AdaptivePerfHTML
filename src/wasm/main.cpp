@@ -109,6 +109,8 @@ int main() {
     json pruned_tree_json = tree_to_json(pruned_tree);
     save_json_to_file(pruned_tree_json, "pruned_tree.json");
 
+
+
     // tree that only includes nodes which overlap with the time period
     // between with two thresholds
     std::cout << "\nFull Tree :\n";
@@ -121,6 +123,51 @@ int main() {
     // between with two thresholds
     std::cout << "\nPruned Tree :\n";
     print_tree(pruned_tree);
+
+
+
+
+    // Test merging:
+
+    TreeNode root1 = {
+        "root", 0, false, {}, {
+            {"A", 10, false, {{100, 1}, {200, 2}}, {{"X", 5, true, {{300, 3}}, {}}, {"Y", 10, false, {{400, 4}}, {}}}},
+            {"B", 20, true, {{600, 6}}, {}},
+            {"A", 5, false, {{900, 9}}, {{"X", 4, false, {{1000, 10}}, {}}, {"Y", 2, true, {{1100, 11}}, {}}}},
+        }
+    };
+
+     TreeNode root2 = {
+        "root", 0, false, {}, {
+            {"A", 10, false, {{100, 1}, {200, 2}}, {{"X", 5, true, {{300, 3}}, {{"Z", 10, false, {{401, 4}}, {}}}}, {"Y", 10, false, {{400, 4}}, {{"Z", 10, false, {{400, 4}}, {}}}}}},
+            {"B", 20, true, {{600, 6}}, {{"Z", 10, false, {{402, 4}}, {}}}},
+            {"A", 5, false, {{900, 9}}, {{"X", 4, false, {{1000, 10}}, {{"Z", 10, false, {{404, 4}}, {}}}}, {"Y", 2, true, {{1100, 11}}, {{"Z", 10, false, {{405, 4}}, {}}}}}},
+        }
+    };
+
+
+    TreeNode pruned_tree1 = slice_flame_graph(root1, threshold_left,
+                                      threshold_right, counter_tree_key, false);
+
+    TreeNode pruned_tree2 = slice_flame_graph(root2, threshold_left,
+                                      threshold_right, counter_tree_key, false);
+     
+
+
+
+    std::cout  << "Not merged 1 "<< std::endl;
+    print_tree(root1);
+
+    std::cout  << "Merged 1 "<< std::endl;
+    print_tree(pruned_tree1);
+
+    std::cout << std::endl;
+
+    std::cout  << "Not merged 2 "<< std::endl;
+    print_tree(root2);
+
+    std::cout  << "Merged 2 "<< std::endl;
+    print_tree(pruned_tree2);
 
   } else {
     std::cerr << "The walltime array does not have at least two elements." << std::endl;
