@@ -77,7 +77,8 @@ TreeNode prune_tree(const TreeNode &node, uint64_t threshold_left,
 
 void mergeNodes(TreeNode &target, const TreeNode &source) {
     target.value += source.value;
-    target.samples.insert(target.samples.end(), source.samples.begin(), source.samples.end());
+    //target.samples.insert(target.samples.end(), source.samples.begin(), source.samples.end());
+    target.samples.clear();
     target.children.insert(target.children.end(), source.children.begin(), source.children.end());
 }
 
@@ -110,7 +111,7 @@ TreeNode slice_flame_graph(const TreeNode &node, uint64_t threshold_left,
                     threshold_right, counter_name);
 
       if(time_ordered){
-         return  pruned_tree;
+         return pruned_tree;
       }
 
       mergeTree(pruned_tree);
