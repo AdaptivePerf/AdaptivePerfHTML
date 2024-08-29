@@ -16,11 +16,14 @@ struct TreeNode {
   uint64_t value;
   bool cold;
   std::vector<Sample> samples;
-  std::vector<TreeNode> children;
+  std::vector<TreeNode *> children;
 };
 
-TreeNode slice_flame_graph(const TreeNode &node, uint64_t threshold_left,
+TreeNode* slice_flame_graph(const TreeNode* node, uint64_t threshold_left,
                     uint64_t threshold_right, const std::string counter_name, bool time_ordered);
+
+void deleteTree(TreeNode* node); 
+
 
 
 #endif // TREE_PARSE_H
