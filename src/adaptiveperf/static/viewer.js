@@ -10,7 +10,7 @@
 var window_dict = {};
 
 const flame_graph_window = `
-<div class="window flamegraph_window" onmouseup="onWindowMouseUp()">
+<div class="window flamegraph_window">
   <div class="window_header">
     <span class="window_title">Flame graphs</span>
     <span class="window_close" onmousedown="onWindowCloseMouseDown(event)">
@@ -35,13 +35,11 @@ const flame_graph_window = `
         <select name="metric" class="flamegraph_metric" onchange="onMetricChange(event)">
 
         </select>
-        <input type="checkbox" class="flamegraph_time_ordered"
-         onchange="onTimeOrderedChange(event)">
+        <input type="checkbox" class="flamegraph_time_ordered" />
         <label class="flamegraph_time_ordered_label">Time-ordered</label>
       </div>
       <div class="flamegraph_remainder">
         <input type="text" class="flamegraph_search"
-               oninput="onSearchQueryChange(this.value)"
                placeholder="Search..." />
         <!-- This SVG is from Google Material Icons, originally licensed under
              Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
@@ -55,9 +53,9 @@ const flame_graph_window = `
       </div>
     </div>
     <div class="flamegraph_search_results">
-      <b>Search results:</b> <span class="search_blocks"></span> block(s) accounting for
-      <span class="search_found"></span> unit(s) out of
-      <span class="search_total"></span> (<span class="search_percentage"></span>%)
+      <b>Search results:</b> <span class="flamegraph_search_blocks"></span> block(s) accounting for
+      <span class="flamegraph_search_found"></span> unit(s) out of
+      <span class="flamegraph_search_total"></span> (<span class="flamegraph_search_percentage"></span>%)
     </div>
     <div class="flamegraph scrollable">
       <p class="no_flamegraph">
@@ -379,21 +377,21 @@ $(document).on('change', '#results_combobox', function() {
                         var flame_graphs_present = false;
 
                         console.log(metrics_dict[props.group]);
-                        
+
                         for (const [k, v] of Object.entries(metrics_dict[props.group])) {
                             if (v.flame_graph) {
                                 if (!flame_graphs_present) {
                                     flame_graphs_present = true;
 
                                     $(`<div class="menu_item"
-                                        onclick="onMenuItemClick('flame_graphs',
+                                        onclick="onMenuItemClick(event, 'flame_graphs',
                                         '${props.group}')">
                                           Flame graphs
                                        </div>`).appendTo('#menu_items');
                                 }
                             } else {
                                 $(`<div class="menu_item"
-                                    onclick="onMenuItemClick('${k}', '${props.group}')">
+                                    onclick="onMenuItemClick(event, '${k}', '${props.group}')">
                                      ${v.title}
                                    </div>`).appendTo('#menu_items');
                             }
@@ -468,24 +466,51 @@ $(document).on('change', '#results_combobox', function() {
     });
 });
 
-function onMenuItemClick(analysis_type, timeline_group_id) {
+function createWindowDOM(analysis_type) {
+    if (analysis_type === 'flame_graphs') {
+        return $(flame_graph_window);
+    }
+}
+
+function onMenuItemClick(event, analysis_type, timeline_group_id) {
     $('#menu_block').hide();
 
+    var index = 0;
+    var new_window_id = `${analysis_type}_${timeline_group_id}_${index}`;
+
+    while (new_window_id in window_dict) {
+        index++;
+        new_window_id = `${analysis_type}_${timeline_group_id}_${index}`;
+    }
+
+    window_dict[new_window_id] = {
+        'type': analysis_type,
+        'data': {}
+    };
+
+    var new_window = createWindowDOM(analysis_type);
+    new_window.css('top', event.pageY + 'px');
+    new_window.css('left', event.pageX + 'px');
+    new_window.attr('id', new_window_id);
+    new_window.attr('onmouseup', 'onWindowMouseUp(\'' +
+                    new_window.attr('id') + '\')');
+    new_window.find('.window_header').attr('onmousedown', 'startDrag(event, \'' +
+                                           new_window.attr('id') + '\')');
+    new_window.find('.window_close').attr(
+        'onclick', 'onWindowCloseClick(event, \'' +
+            new_window.attr('id') + '\')');
+    new_window.appendTo('body');
+    
     if (analysis_type === 'flame_graphs') {
-        var new_window = $(flame_graph_window);
-        new_window.css('display', 'none');
-        new_window.attr('id', `${analysis_type}_${timeline_group_id}`);
-        new_window.find('.window_header').attr('onmousedown', 'startDrag(event, \'' +
-                                               new_window.attr('id') + '\')');
-        new_window.find('.window_close').attr(
-            'onclick', 'onWindowCloseClick(event, \'' +
-                new_window.attr('id') + '\')');
         new_window.find('.flamegraph_time_ordered').attr(
             'id', new_window.attr('id') + '_time_ordered');
         new_window.find('.flamegraph_time_ordered_label').attr(
             'for', new_window.find('.flamegraph_time_ordered').attr('id'));
-        
-        new_window.appendTo('body');
+        new_window.find('.flamegraph_search').attr(
+            'oninput', 'onSearchQueryChange(\'' + new_window.attr('id') + '\',' +
+                'this.value)');
+        new_window.find('.flamegraph_time_ordered').attr(
+            'onchange', 'onTimeOrderedChange(\'' + new_window.attr('id') + '\', event)');
 
         var runtime_select = 0;
 
@@ -493,17 +518,15 @@ function onMenuItemClick(analysis_type, timeline_group_id) {
             runtime_select = 1;
         }
 
-        new_window.find('.window_title').html(item_dict[timeline_group_id][runtime_select]);
-
+        new_window.find('.window_title').html(
+            'Flame graphs for ' +
+                item_dict[timeline_group_id][runtime_select]);
         new_window.find('.flamegraph_metric').empty();
-        new_window.find('.flamegraph_metric').append(
-            new Option('Wall time (ns)', 'walltime'));
 
         var dict = metrics_dict[timeline_group_id];
-        for (var metric_value in dict) {
+        for (const [k, v] of Object.entries(dict)) {
             new_window.find('.flamegraph_metric').append(
-                new Option(dict[metric_value],
-                           metric_value));
+                new Option(v.title, k));
         }
 
         new_window.find('.flamegraph_metric').val('walltime');
@@ -517,7 +540,7 @@ function onMenuItemClick(analysis_type, timeline_group_id) {
                     '#threshold_input').val())];
 
             if (!('walltime' in result_obj)) {
-                flamegraph_obj = undefined;
+                window_dict[window_id].data.flamegraph_obj = undefined;
                 new_window.find('.flamegraph_svg').hide();
                 new_window.find('.flamegraph_search').val('');
                 new_window.find('.no_flamegraph').show();
@@ -541,7 +564,7 @@ function onMenuItemClick(analysis_type, timeline_group_id) {
                 result_obj = ajax_obj;
 
                 if (!('walltime' in result_obj)) {
-                    flamegraph_obj = undefined;
+                    window_dict[window_id].data.flamegraph_obj = undefined;
                     new_window.find('.flamegraph_svg').hide();
                     new_window.find('.flamegraph_search').val('');
                     new_window.find('.no_flamegraph').show();
@@ -551,7 +574,7 @@ function onMenuItemClick(analysis_type, timeline_group_id) {
 
                 new_window.find('.window_loading').hide();
             }).fail(ajax_obj => {
-                flamegraph_obj = undefined;
+                window_dict[window_id].data.flamegraph_obj = undefined;
                 new_window.find('.flamegraph_svg').hide();
                 new_window.find('.flamegraph_search').val('');
                 new_window.find('.no_flamegraph').show();
@@ -559,19 +582,20 @@ function onMenuItemClick(analysis_type, timeline_group_id) {
             });
         }
 
-        new_window.show();
-        new ResizeObserver(onFlameGraphBlockResize).observe(new_window[0]);
+        new ResizeObserver(onFlameGraphWindowResize).observe(new_window[0]);
     }
 }
 
 function updateFlameGraph(window_id, data, always_change_height) {
     var window_obj = $('#' + window_id);
+    var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
     if (flamegraph_obj !== undefined) {
         var update_height = function() {
             var flamegraph_svg = window_obj.find('.flamegraph_svg').children()[0];
 
             if (flamegraph_svg !== undefined) {
                 var target_height = flamegraph_svg.getBBox().height;
+                console.log(target_height);
 
                 if (always_change_height || target_height > window_obj.find('.flamegraph_svg').height()) {
                     window_obj.find('.flamegraph_svg').height(target_height);
@@ -591,7 +615,8 @@ function updateFlameGraph(window_id, data, always_change_height) {
 
 function openFlameGraph(window_id, metric) {
     var window_obj = $('#' + window_id);
-    flamegraph_obj = flamegraph();
+    window_dict[window_id].data.flamegraph_obj = flamegraph();
+    var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
     flamegraph_obj.inverted(true);
     flamegraph_obj.sort(window_obj.find('.flamegraph_time_ordered').prop('checked') ? false : true);
     flamegraph_obj.color(function(node, original_color) {
@@ -631,14 +656,15 @@ function openFlameGraph(window_id, metric) {
             }
 
             parent.children = new_children;
-            updateFlameGraph(window_id, d3.select('#svg').datum().data, false);
+            updateFlameGraph(window_id, d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum().data, false);
         }
     });
     flamegraph_obj.setSearchHandler(function(results, sum, total) {
         window_obj.find('.flamegraph_search_blocks').html(results.length.toLocaleString());
         window_obj.find('.flamegraph_search_found').html(sum.toLocaleString());
-        window_obj.find('.flamegraph_search_total').html(flamegraph_total.toLocaleString());
-        window_obj.find('.flamegraph_search_percentage').html((1.0 * sum / flamegraph_total * 100).toFixed(2));
+        window_obj.find('.flamegraph_search_total').html(window_dict[window_id].data.total.toLocaleString());
+        window_obj.find('.flamegraph_search_percentage').html(
+            (1.0 * sum / window_dict[window_id].data.total * 100).toFixed(2));
     });
 
     if (metric === 'walltime') {
@@ -652,34 +678,20 @@ function openFlameGraph(window_id, metric) {
     window_obj.find('.flamegraph_search').val('');
     window_obj.find('.flamegraph_search_results').hide();
     window_obj.find('.flamegraph_svg').attr(
-        'id', window_obj.attr('id') + '_flamegraph_svg');                                    
+        'id', window_obj.attr('id') + '_flamegraph_svg');
     window_obj.find('.flamegraph_svg').show();
-    flamegraph_obj.width($('#result_block').width());
+    flamegraph_obj.width(window_obj.find('.flamegraph').width());
     d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum(structuredClone(
         result_obj[metric][
             window_obj.find('.flamegraph_time_ordered').prop('checked') ? 1 : 0])).call(
                 flamegraph_obj);
-    flamegraph_total = d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum().data['value'];
+    window_dict[window_id].data.total =
+        d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum().data['value'];
     updateFlameGraph(window_id, null, true);
     flamegraph_obj.width(window_obj.find('.flamegraph_svg').width());
     flamegraph_obj.update();
 
-    var pos = window_obj.position();
-    window_obj.css('max-height', ($(window).outerHeight() - pos.top) + 'px');
-    window_obj.css('max-width', ($(window).outerWidth() - pos.left) + 'px');
-
     window_obj.find('.flamegraph')[0].scrollTop = 0;
-}
-
-function onAnalysisCheckBoxClick(event) {
-    var checkbox = event.target;
-    var id = checkbox.value + '_window';
-
-    if (checkbox.checked) {
-        $('#' + id).show();
-    } else {
-        $('#' + id).hide();
-    }
 }
 
 function onBackgroundClick(event) {
@@ -692,11 +704,6 @@ function onBackgroundClick(event) {
     }
 }
 
-function onResultCloseClick() {
-    $('#svg').html('');
-    $('#result_background').hide();
-}
-
 function onWindowCloseMouseDown(event) {
     event.stopPropagation();
     event.preventDefault();
@@ -704,9 +711,11 @@ function onWindowCloseMouseDown(event) {
 
 function onWindowCloseClick(event, window_id) {
     $('#' + window_id).remove();
+    delete window_dict[window_id];
 }
 
-function onMetricChange(event) {
+function onMetricChange(window_id, event) {
+    var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
     if ($('#result_background').is(':visible') ||
         flamegraph_obj !== undefined) {
         var metric = event.currentTarget.value;
@@ -715,7 +724,7 @@ function onMetricChange(event) {
         $('#time_ordered').prop('checked', false);
 
         if (metric in result_obj) {
-            openFlameGraph(metric);
+            openFlameGraph(window_id, metric);
         } else {
             $('#search').val('');
             $('#search_results').hide();
@@ -727,10 +736,11 @@ function onMetricChange(event) {
 
 function onTimeOrderedChange(window_id, event) {
     var window_obj = $('#' + window_id);
+    var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
     if (flamegraph_obj !== undefined) {
         flamegraph_obj.sort(!event.currentTarget.checked);
         updateFlameGraph(window_id, structuredClone(
-            result_obj[$('#metric').val()][
+            result_obj[window_obj.find('.flamegraph_metric').val()][
                 event.currentTarget.checked ? 1 : 0]), true);
 
         window_obj.find('.flamegraph_search').val('');
@@ -740,6 +750,7 @@ function onTimeOrderedChange(window_id, event) {
 
 function onSearchQueryChange(window_id, value) {
     var window_obj = $('#' + window_id);
+    var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
     if (flamegraph_obj !== undefined) {
         if (value === undefined || value === "") {
             window_obj.find('.flamegraph_search_results').hide();
@@ -753,16 +764,35 @@ function onSearchQueryChange(window_id, value) {
 
 function onWindowMouseUp(window_id) {
     var window_obj = $('#' + window_id);
-    if (flamegraph_block_being_resized) {
+    var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
+    if (window_dict[window_id].data.being_resized) {
         flamegraph_obj.width(window_obj.find('.flamegraph_svg').width());
         flamegraph_obj.update();
-        flamegraph_block_being_resized = false;
+        window_dict[window_id].data.being_resized = false;
     }
 }
 
-function onFlameGraphBlockResize() {
-    if (flamegraph_obj !== undefined) {
-        flamegraph_block_being_resized = true;
+function onFlameGraphWindowResize(windows) {
+    for (var window of windows) {
+        var target = window.target;
+
+        if (target === null) {
+            continue;
+        }
+        
+        var window_id = $(target).attr('id');
+        while (target !== null && !(window_id in window_dict)) {
+            target = target.parentElement;
+            window_id = $(target).attr('id');
+        }
+
+        if (target === null) {
+            continue;
+        }
+
+        if (window_dict[window_id].data.flamegraph_obj !== undefined) {
+            window_dict[window_id].data.being_resized = true;
+        }
     }
 }
 
@@ -863,13 +893,8 @@ function startDrag(event, window_id) {
         var newY = event.pageY - startY;
         var dragged_rect = dragged.getBoundingClientRect();
 
-        if (newX >= 0 && newX + dragged_rect.width <= $(window).outerWidth()) {
-            dragged.style.left = newX + 'px';
-        }
-
-        if (newY >= 0 && newY + dragged_rect.height <= $(window).outerHeight()) {
-            dragged.style.top = newY + 'px';
-        }
+        dragged.style.left = newX + 'px';
+        dragged.style.top = newY + 'px';
     });
 
     $('body').mouseup(function(event) {
