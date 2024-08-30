@@ -1,14 +1,7 @@
-// Window directory structure:
-// {
-//     '<div ID>': {
-//         'type': '<analysis type, e.g. flame_graphs>',
-//         'data': {
-//             <data relevant to analysis type>
-//         }
-//     }
-// }
-var window_dict = {};
+// AdaptivePerfHTML: Tool for producing HTML summary of AdaptivePerf results
+// Copyright (C) CERN. See LICENSE for details.
 
+// Window templates start here
 const flame_graph_window = `
 <div class="window flamegraph_window">
   <div class="window_header">
@@ -44,9 +37,8 @@ const flame_graph_window = `
         <!-- This SVG is from Google Material Icons, originally licensed under
              Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
              (covered by GNU GPL v3 here) -->
-        <svg class="pointer" xmlns="http://www.w3.org/2000/svg" height="24px"
-             viewBox="0 -960 960 960" width="24px" fill="#000000"
-             onclick="downloadFlameGraph()">
+        <svg class="pointer flamegraph_download" xmlns="http://www.w3.org/2000/svg" height="24px"
+             viewBox="0 -960 960 960" width="24px" fill="#000000">
           <title>Download the current flame graph view as PNG</title>
           <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
         </svg>
@@ -70,29 +62,45 @@ const flame_graph_window = `
   </div>
 </div>
 `;
+// Window templates end here
 
-var flamegraph_obj = undefined;
-var result_obj = undefined;
-var result_cache = {};
-var callchain_obj = undefined;
-var perf_maps_obj = undefined;
-var perf_maps_cache = {};
-var sampled_diff_dict = {};
-var flamegraph_block_being_resized = false;
-var flamegraph_block_mouse_down = false;
-var flamegraph_total = 0;
-var item_list = [];
-var group_list = [];
-var item_dict = {};
-var callchain_dict = {};
-var metrics_dict = {};
-var tooltip_dict = {};
-var warning_dict = {};
-var general_metrics_dict = {};
+// Window directory structure:
+// {
+//     '<div ID>': {
+//         'type': '<analysis type, e.g. flame_graphs>',
+//         'data': {
+//             <data relevant to analysis type>
+//         }
+//     }
+// }
+var window_dict = {};
+
+// (Profiling) session directory structure:
+// {
+//     '<session ID>': {
+//         'result_cache': ...,
+//         'callchain_obj': ...,
+//         'callchain_dict': ...,
+//         'perf_maps_obj': ...,
+//         'perf_maps_cache': ...,
+//         'sampled_diff_dict': ...,
+//         'item_list': ...,
+//         'group_list': ...,
+//         'item_dict': ...,
+//         'callchain_dict': ...,
+//         'metrics_dict': ...,
+//         'tooltip_dict': ...,
+//         'warning_dict': ...,
+//         'general_metrics_dict': ...,
+//         'overall_end_time': ...
+//     }
+// }
+var session_dict = {};
 
 function getSymbolFromMap(elem) {
-    if (elem in perf_maps_cache) {
-        return perf_maps_cache[elem];
+    var session = session_dict[$('#results_combobox').val()];
+    if (elem in session.perf_maps_cache) {
+        return session.perf_maps_cache[elem];
     }
 
     var regex = /^\((0x[0-9a-f]+);(.+)\)$/;
@@ -100,8 +108,8 @@ function getSymbolFromMap(elem) {
     var addr = parseInt(match[1], 16);
     var map_name = match[2];
 
-    if (map_name in perf_maps_obj) {
-        var data = perf_maps_obj[map_name];
+    if (map_name in session.perf_maps_obj) {
+        var data = session.perf_maps_obj[map_name];
         var start = 0;
         var end = data.length - 1;
 
@@ -111,7 +119,7 @@ function getSymbolFromMap(elem) {
             var addr2 = parseInt(data[middle][1], 16);
 
             if (addr >= addr1 && addr <= addr2) {
-                perf_maps_cache[elem] = data[middle][2];
+                session.perf_maps_cache[elem] = data[middle][2];
                 return data[middle][2];
             } else if (addr < addr1) {
                 end = middle - 1;
@@ -130,6 +138,13 @@ $(document).on('change', '#results_combobox', function() {
     $('#loading').show();
     $('#results_combobox option:selected').each(function() {
         var value = $(this).val();
+        var session_init = false;
+
+        if (!(value in session_dict)) {
+            session_init = true;
+            session_dict[value] = {};
+        }
+
         var ajaxPostOptions = {
             url: value + '/',
             method: 'POST',
@@ -142,7 +157,8 @@ $(document).on('change', '#results_combobox', function() {
                                        item_dict, metrics_dict,
                                        callchain_dict, tooltip_dict,
                                        warning_dict, overall_end_time,
-                                       general_metrics_dict) {
+                                       general_metrics_dict,
+                                       sampled_diff_dict) {
                 var item = {
                     id: json.id,
                     group: json.id,
@@ -268,7 +284,8 @@ $(document).on('change', '#results_combobox', function() {
                                       tooltip_dict,
                                       warning_dict,
                                       overall_end_time,
-                                      general_metrics_dict);
+                                      general_metrics_dict,
+                                      sampled_diff_dict);
                 }
             }
 
@@ -279,33 +296,43 @@ $(document).on('change', '#results_combobox', function() {
                     dataType: 'json',
                     data: {perf_map: true}
                 }).done(ajax_obj => {
-                    perf_maps_obj = ajax_obj;
-                    part3();
+                    session_dict[value].perf_maps_obj = ajax_obj;
+                    part3(true);
                 }).fail(ajax_obj => {
                     alert('Could not obtain the perf symbol maps! You ' +
                           'will not get meaningful names when checking ' +
                           'stack traces e.g. for JIT-ed codes.');
-                    part3();
+                    part3(true);
                 });
             }
 
-            function part3() {
-                item_list = [];
-                group_list = [];
-                item_dict = {};
-                callchain_dict = {};
-                metrics_dict = {};
-                tooltip_dict = {};
-                warning_dict = {};
-                general_metrics_dict = {};
-                var overall_end_time = [0];
+            function part3(init) {
+                if (init) {
+                    session_dict[value].item_list = [];
+                    session_dict[value].group_list = [];
+                    session_dict[value].item_dict = {};
+                    session_dict[value].callchain_dict = {};
+                    session_dict[value].metrics_dict = {};
+                    session_dict[value].tooltip_dict = {};
+                    session_dict[value].warning_dict = {};
+                    session_dict[value].general_metrics_dict = {};
+                    session_dict[value].perf_maps_cache = {};
+                    session_dict[value].result_cache = {};
+                    session_dict[value].sampled_diff_dict = {};
+                    session_dict[value].overall_end_time = [0];
 
-                from_json_to_item(JSON.parse(result), 0,
-                                  item_list, group_list, item_dict,
-                                  metrics_dict,
-                                  callchain_dict, tooltip_dict,
-                                  warning_dict, overall_end_time,
-                                  general_metrics_dict);
+                    from_json_to_item(JSON.parse(result), 0,
+                                      session_dict[value].item_list,
+                                      session_dict[value].group_list,
+                                      session_dict[value].item_dict,
+                                      session_dict[value].metrics_dict,
+                                      session_dict[value].callchain_dict,
+                                      session_dict[value].tooltip_dict,
+                                      session_dict[value].warning_dict,
+                                      session_dict[value].overall_end_time,
+                                      session_dict[value].general_metrics_dict,
+                                      session_dict[value].sampled_diff_dict);
+                }
 
                 var container = $('#block')[0];
                 container.innerHTML = '';
@@ -316,8 +343,8 @@ $(document).on('change', '#results_combobox', function() {
 
                 var timeline = new vis.Timeline(
                     container,
-                    item_list,
-                    group_list,
+                    session_dict[value].item_list,
+                    session_dict[value].group_list,
                     {
                         format: {
                             minorLabels: {
@@ -334,12 +361,23 @@ $(document).on('change', '#results_combobox', function() {
                         },
                         showMajorLabels: false,
                         min: 0,
-                        max: 2 * overall_end_time[0]
+                        max: 2 * session_dict[value].overall_end_time[0]
                     }
                 );
 
                 timeline.on('contextmenu', function (props) {
                     if (props.group != null) {
+                        var item_list = session_dict[value].item_list;
+                        var group_list = session_dict[value].group_list;
+                        var item_dict = session_dict[value].item_dict;
+                        var callchain_dict = session_dict[value].callchain_dict;
+                        var callchain_obj = session_dict[value].callchain_obj;
+                        var metrics_dict = session_dict[value].metrics_dict;
+                        var tooltip_dict = session_dict[value].tooltip_dict;
+                        var warning_dict = session_dict[value].warning_dict;
+                        var general_metrics_dict = session_dict[value].general_metrics_dict;
+                        var sampled_diff_dict = session_dict[value].sampled_diff_dict;
+                        
                         if (props.group in callchain_dict) {
                             $('#callchain').text(callchain_dict[props.group].map(elem => {
                                 if (callchain_obj !== undefined &&
@@ -375,8 +413,6 @@ $(document).on('change', '#results_combobox', function() {
                         $('#menu_items').empty();
 
                         var flame_graphs_present = false;
-
-                        console.log(metrics_dict[props.group]);
 
                         for (const [k, v] of Object.entries(metrics_dict[props.group])) {
                             if (v.flame_graph) {
@@ -441,13 +477,13 @@ $(document).on('change', '#results_combobox', function() {
                 dataType: 'json',
                 data: {callchain: true}
             }).done(ajax_obj => {
-                callchain_obj = ajax_obj;
+                session_dict[value].callchain_obj = ajax_obj;
                 part2();
             }).fail(ajax_obj => {
                 alert('Could not obtain the callchain mappings! You ' +
                       'will not get meaningful names when checking ' +
                       'any stack traces.');
-                part3();
+                part3(true);
             });
         }
 
@@ -472,45 +508,20 @@ function createWindowDOM(analysis_type) {
     }
 }
 
-function onMenuItemClick(event, analysis_type, timeline_group_id) {
-    $('#menu_block').hide();
-
-    var index = 0;
-    var new_window_id = `${analysis_type}_${timeline_group_id}_${index}`;
-
-    while (new_window_id in window_dict) {
-        index++;
-        new_window_id = `${analysis_type}_${timeline_group_id}_${index}`;
-    }
-
-    window_dict[new_window_id] = {
-        'type': analysis_type,
-        'data': {}
-    };
-
-    var new_window = createWindowDOM(analysis_type);
-    new_window.css('top', event.pageY + 'px');
-    new_window.css('left', event.pageX + 'px');
-    new_window.attr('id', new_window_id);
-    new_window.attr('onmouseup', 'onWindowMouseUp(\'' +
-                    new_window.attr('id') + '\')');
-    new_window.find('.window_header').attr('onmousedown', 'startDrag(event, \'' +
-                                           new_window.attr('id') + '\')');
-    new_window.find('.window_close').attr(
-        'onclick', 'onWindowCloseClick(event, \'' +
-            new_window.attr('id') + '\')');
-    new_window.appendTo('body');
-    
+function setupWindow(window_obj, timeline_group_id, analysis_type) {
+    var session = session_dict[$('#results_combobox').val()];
     if (analysis_type === 'flame_graphs') {
-        new_window.find('.flamegraph_time_ordered').attr(
-            'id', new_window.attr('id') + '_time_ordered');
-        new_window.find('.flamegraph_time_ordered_label').attr(
-            'for', new_window.find('.flamegraph_time_ordered').attr('id'));
-        new_window.find('.flamegraph_search').attr(
-            'oninput', 'onSearchQueryChange(\'' + new_window.attr('id') + '\',' +
+        window_obj.find('.flamegraph_time_ordered').attr(
+            'id', window_obj.attr('id') + '_time_ordered');
+        window_obj.find('.flamegraph_time_ordered_label').attr(
+            'for', window_obj.find('.flamegraph_time_ordered').attr('id'));
+        window_obj.find('.flamegraph_search').attr(
+            'oninput', 'onSearchQueryChange(\'' + window_obj.attr('id') + '\',' +
                 'this.value)');
-        new_window.find('.flamegraph_time_ordered').attr(
-            'onchange', 'onTimeOrderedChange(\'' + new_window.attr('id') + '\', event)');
+        window_obj.find('.flamegraph_time_ordered').attr(
+            'onchange', 'onTimeOrderedChange(\'' + window_obj.attr('id') + '\', event)');
+        window_obj.find('.flamegraph_download').attr(
+            'onclick', 'downloadFlameGraph(\'' + window_obj.attr('id') + '\')');
 
         var runtime_select = 0;
 
@@ -518,34 +529,36 @@ function onMenuItemClick(event, analysis_type, timeline_group_id) {
             runtime_select = 1;
         }
 
-        new_window.find('.window_title').html(
+        window_obj.find('.window_title').html(
             'Flame graphs for ' +
-                item_dict[timeline_group_id][runtime_select]);
-        new_window.find('.flamegraph_metric').empty();
+                session.item_dict[timeline_group_id][runtime_select]);
+        window_obj.find('.flamegraph_metric').empty();
 
-        var dict = metrics_dict[timeline_group_id];
+        var dict = session.metrics_dict[timeline_group_id];
         for (const [k, v] of Object.entries(dict)) {
-            new_window.find('.flamegraph_metric').append(
+            window_obj.find('.flamegraph_metric').append(
                 new Option(v.title, k));
         }
 
-        new_window.find('.flamegraph_metric').val('walltime');
-        new_window.find('.flamegraph_time_ordered').prop('checked', false);
-        new_window.find('.flamegraph').attr('data-id', timeline_group_id);
+        window_obj.find('.flamegraph_metric').val('walltime');
+        window_obj.find('.flamegraph_time_ordered').prop('checked', false);
+        window_obj.find('.flamegraph').attr('data-id', timeline_group_id);
+
+        var window_id = window_obj.attr('id');
 
         if (timeline_group_id + '_' +
-            parseFloat($('#threshold_input').val()) in result_cache) {
-            result_obj = result_cache[
+            parseFloat($('#threshold_input').val()) in session.result_cache) {
+            window_dict[window_id].data.result_obj = session.result_cache[
                 timeline_group_id + '_' + parseFloat($(
                     '#threshold_input').val())];
 
-            if (!('walltime' in result_obj)) {
+            if (!('walltime' in window_dict[window_id].data.result_obj)) {
                 window_dict[window_id].data.flamegraph_obj = undefined;
-                new_window.find('.flamegraph_svg').hide();
-                new_window.find('.flamegraph_search').val('');
-                new_window.find('.no_flamegraph').show();
+                window_obj.find('.flamegraph_svg').hide();
+                window_obj.find('.flamegraph_search').val('');
+                window_obj.find('.no_flamegraph').show();
             } else {
-                openFlameGraph(new_window.attr('id'), 'walltime');
+                openFlameGraph(window_obj.attr('id'), 'walltime');
             }
         } else {
             var pid_tid = timeline_group_id.split('_');
@@ -558,32 +571,76 @@ function onMenuItemClick(event, analysis_type, timeline_group_id) {
                        threshold: 1.0 * parseFloat($(
                            '#threshold_input').val()) / 100}
             }).done(ajax_obj => {
-                result_cache[
+                session.result_cache[
                     timeline_group_id + '_' + parseFloat($(
                         '#threshold_input').val())] = ajax_obj;
-                result_obj = ajax_obj;
+                window_dict[window_id].data.result_obj = ajax_obj;
 
-                if (!('walltime' in result_obj)) {
+                if (!('walltime' in window_dict[window_id].data.result_obj)) {
                     window_dict[window_id].data.flamegraph_obj = undefined;
-                    new_window.find('.flamegraph_svg').hide();
-                    new_window.find('.flamegraph_search').val('');
-                    new_window.find('.no_flamegraph').show();
+                    window_obj.find('.flamegraph_svg').hide();
+                    window_obj.find('.flamegraph_search').val('');
+                    window_obj.find('.no_flamegraph').show();
                 } else {
-                    openFlameGraph(new_window.attr('id'), 'walltime');
+                    openFlameGraph(window_obj.attr('id'), 'walltime');
                 }
 
-                new_window.find('.window_loading').hide();
+                window_obj.find('.window_loading').hide();
             }).fail(ajax_obj => {
                 window_dict[window_id].data.flamegraph_obj = undefined;
-                new_window.find('.flamegraph_svg').hide();
-                new_window.find('.flamegraph_search').val('');
-                new_window.find('.no_flamegraph').show();
-                new_window.find('.window_loading').hide();
+                window_obj.find('.flamegraph_svg').hide();
+                window_obj.find('.flamegraph_search').val('');
+                window_obj.find('.no_flamegraph').show();
+                window_obj.find('.window_loading').hide();
             });
         }
 
-        new ResizeObserver(onFlameGraphWindowResize).observe(new_window[0]);
+        new ResizeObserver(onFlameGraphWindowResize).observe(window_obj[0]);
     }
+}
+
+function onMenuItemClick(event, analysis_type, timeline_group_id) {
+    $('#menu_block').hide();
+
+    var session_id = $('#results_combobox').prop('selectedIndex');
+    var index = 0;
+    var new_window_id =
+        `w_${session_id}_${analysis_type}_${timeline_group_id}_${index}`;
+
+    while (new_window_id in window_dict) {
+        index++;
+        new_window_id =
+            `w_${session_id}_${analysis_type}_${timeline_group_id}_${index}`;
+    }
+
+    window_dict[new_window_id] = {
+        'type': analysis_type,
+        'data': {}
+    };
+
+    var new_window = createWindowDOM(analysis_type);
+    new_window.css('top', event.pageY + 'px');
+    new_window.css('left', event.pageX + 'px');
+    new_window.attr('id', new_window_id);
+    new_window.attr('');
+    new_window.attr('onmouseup', 'onWindowMouseUp(\'' +
+                    new_window.attr('id') + '\')');
+    new_window.find('.window_header').attr('onmousedown', 'startDrag(event, \'' +
+                                           new_window.attr('id') + '\')');
+    new_window.find('.window_close').attr(
+        'onclick', 'onWindowCloseClick(event, \'' +
+            new_window.attr('id') + '\')');
+
+    var loading = $('#loading').clone();
+    loading.removeAttr('id');
+    loading.attr('class', 'loading');
+    loading.prependTo(new_window.find('.window_content'));
+    loading.show();
+
+    new_window.appendTo('body');
+
+    setupWindow(new_window, timeline_group_id, analysis_type);
+    loading.hide();
 }
 
 function updateFlameGraph(window_id, data, always_change_height) {
@@ -595,7 +652,6 @@ function updateFlameGraph(window_id, data, always_change_height) {
 
             if (flamegraph_svg !== undefined) {
                 var target_height = flamegraph_svg.getBBox().height;
-                console.log(target_height);
 
                 if (always_change_height || target_height > window_obj.find('.flamegraph_svg').height()) {
                     window_obj.find('.flamegraph_svg').height(target_height);
@@ -614,7 +670,9 @@ function updateFlameGraph(window_id, data, always_change_height) {
 }
 
 function openFlameGraph(window_id, metric) {
+    var session = session_dict[$('#results_combobox').val()];
     var window_obj = $('#' + window_id);
+    var result_obj = window_dict[window_id].data.result_obj;
     window_dict[window_id].data.flamegraph_obj = flamegraph();
     var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
     flamegraph_obj.inverted(true);
@@ -631,8 +689,8 @@ function openFlameGraph(window_id, metric) {
         }
     });
     flamegraph_obj.getName(function(node) {
-        if (node.data.name in callchain_obj[window_obj.find('.flamegraph_metric').val()]) {
-            return callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
+        if (node.data.name in session.callchain_obj[window_obj.find('.flamegraph_metric').val()]) {
+            return session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
         } else if (/^\(0x[0-9a-f]+;.+\)$/.test(node.data.name)) {
             return getSymbolFromMap(node.data.name);
         } else {
@@ -716,11 +774,12 @@ function onWindowCloseClick(event, window_id) {
 
 function onMetricChange(window_id, event) {
     var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
+    var result_obj = window_dict[window_id].data.result_obj;
     if ($('#result_background').is(':visible') ||
         flamegraph_obj !== undefined) {
         var metric = event.currentTarget.value;
 
-        flamegraph_obj = undefined;
+        window_dict[window_id].data.flamegraph_obj = undefined;
         $('#time_ordered').prop('checked', false);
 
         if (metric in result_obj) {
@@ -737,6 +796,7 @@ function onMetricChange(window_id, event) {
 function onTimeOrderedChange(window_id, event) {
     var window_obj = $('#' + window_id);
     var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
+    var result_obj = window_dict[window_id].data.result_obj;
     if (flamegraph_obj !== undefined) {
         flamegraph_obj.sort(!event.currentTarget.checked);
         updateFlameGraph(window_id, structuredClone(
@@ -779,7 +839,7 @@ function onFlameGraphWindowResize(windows) {
         if (target === null) {
             continue;
         }
-        
+
         var window_id = $(target).attr('id');
         while (target !== null && !(window_id in window_dict)) {
             target = target.parentElement;
@@ -807,7 +867,7 @@ function downloadFlameGraph(window_id) {
     if (filename === null || filename === "") {
         return;
     }
-
+    
     var svg = window_obj.find('.flamegraph_svg').children()[0].cloneNode(true);
     var style = document.createElement('style');
 
