@@ -4,6 +4,7 @@
 import re
 import sys
 import json
+import csv
 from treelib import Tree
 from pathlib import Path
 from collections import deque
@@ -200,6 +201,27 @@ class ProfilingResults:
                     }
 
         self._general_metrics = {}
+
+    def get_general_analysis(self, analysis_type):
+        """
+        Get general analysis data of a specified type. If the type
+        does not exist, None is returned.
+
+        :param str analysis_type: The type of a general analysis which
+                                  data should be returned for, e.g.
+                                  "roofline" for a cache-aware roofline
+                                  model.
+        """
+        if analysis_type == 'roofline':
+            p = self._path / 'processed' / 'roofline.csv'
+
+            if not p.exists():
+                return None
+
+            with p.open(mode='r', newline='') as f:
+                reader = csv.reader(p)
+        else:
+            return None
 
     def get_flame_graph(self, pid, tid, compress_threshold):
         """
@@ -432,8 +454,9 @@ class ProfilingResults:
           An example object is {"page-faults": {"title": "Page faults",
           "flame_graph": true}}. The structure can also be empty.
         * "general_metrics": the JSON object mapping general profiling
-          metrics to their website titles (e.g. "roofline" ->
-          "Roofline model"). This is set only for the root and it can be empty.
+          metrics to their website titles and other auxiliary data (e.g.
+          {"roofline": {"title": "Roofline model", ...}). This is set
+          only for the root and it can be empty.
         * "children": the list of all threads/processes spawned by the
           thread/process. Each element has the same structure as the root
           except for "general_metrics" which is absent.

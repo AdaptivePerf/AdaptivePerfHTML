@@ -2,18 +2,75 @@
 // Copyright (C) CERN. See LICENSE for details.
 
 // Window templates start here
-const flame_graph_window = `
-<div class="window flamegraph_window">
+function createWindowDOM(analysis_type) {
+    const roofline_window = `
+<div class="window roofline_window">
   <div class="window_header">
-    <span class="window_title">Flame graphs</span>
-    <span class="window_close" onmousedown="onWindowCloseMouseDown(event)">
+    <span class="window_title"></span>
+    <span class="window_close" onmousedown="windowStopPropagation(event)">
       <!-- This SVG is from Google Material Icons, originally licensed under
            Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
            (covered by GNU GPL v3 here) -->
       <svg xmlns="http://www.w3.org/2000/svg" height="24px"
-           viewBox="0 -960 960 960"
-           width="24px" fill="#ffffff">
+           viewBox="0 -960 960 960" width="24px">
+        <title>Close</title>
         <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
+      </svg>
+    </span>
+   <span class="window_visibility" onmousedown="windowStopPropagation(event)">
+      <!-- This SVG is from Google Material Icons, originally licensed under
+           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+           (covered by GNU GPL v3 here) -->
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
+           viewBox="0 -960 960 960" width="24px">
+        <title>Toggle visibility</title>
+        <path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/>
+      </svg>
+    </span>
+  </div>
+  <div class="roofline_content window_content">
+    <div class="roofline_settings">
+      <div class="roofline_type">
+        <span class="roofline_type_label">
+          Type:
+        </span>
+        <select name="roofline_type" class="roofline_type_select">
+
+        </select>
+      </div>
+      <fieldset class="roofline_elements">
+        <legend>Bounds</legend>
+      </fieldset>
+    </div>
+    <div class="roofline">
+      
+    </div>
+  </div>
+</div>
+`;
+    
+    const flame_graph_window = `
+<div class="window flamegraph_window">
+  <div class="window_header">
+    <span class="window_title">Flame graphs</span>
+    <span class="window_close" onmousedown="windowStopPropagation(event)">
+      <!-- This SVG is from Google Material Icons, originally licensed under
+           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+           (covered by GNU GPL v3 here) -->
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
+           viewBox="0 -960 960 960" width="24px">
+        <title>Close</title>
+        <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
+      </svg>
+    </span>
+   <span class="window_visibility" onmousedown="windowStopPropagation(event)">
+      <!-- This SVG is from Google Material Icons, originally licensed under
+           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+           (covered by GNU GPL v3 here) -->
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
+           viewBox="0 -960 960 960" width="24px">
+        <title>Toggle visibility</title>
+        <path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/>
       </svg>
     </span>
   </div>
@@ -62,6 +119,13 @@ const flame_graph_window = `
   </div>
 </div>
 `;
+    
+    if (analysis_type === 'flame_graphs') {
+        return $(flame_graph_window);
+    } else if (analysis_type === 'roofline') {
+        return $(roofline_window);
+    }
+}
 // Window templates end here
 
 // Window directory structure:
@@ -70,7 +134,10 @@ const flame_graph_window = `
 //         'type': '<analysis type, e.g. flame_graphs>',
 //         'data': {
 //             <data relevant to analysis type>
-//         }
+//         },
+//         'collapsed': <whether the window is collapsed>,
+//         'last_height': <last window height before becoming invisible, may be undefined>,
+//         'min_height': <window minimum height, may be undefined>
 //     }
 // }
 var window_dict = {};
@@ -96,6 +163,9 @@ var window_dict = {};
 //     }
 // }
 var session_dict = {};
+
+var current_focused_window_id = undefined;
+var largest_z_index = 0;
 
 function getSymbolFromMap(elem) {
     var session = session_dict[$('#results_combobox').val()];
@@ -377,7 +447,7 @@ $(document).on('change', '#results_combobox', function() {
                         var warning_dict = session_dict[value].warning_dict;
                         var general_metrics_dict = session_dict[value].general_metrics_dict;
                         var sampled_diff_dict = session_dict[value].sampled_diff_dict;
-                        
+
                         if (props.group in callchain_dict) {
                             $('#callchain').text(callchain_dict[props.group].map(elem => {
                                 if (callchain_obj !== undefined &&
@@ -410,7 +480,7 @@ $(document).on('change', '#results_combobox', function() {
                         $('#runtime').html(
                             tooltip_dict[props.group][runtime_select]);
 
-                        $('#menu_items').empty();
+                        $('#thread_menu_items').empty();
 
                         var flame_graphs_present = false;
 
@@ -423,20 +493,20 @@ $(document).on('change', '#results_combobox', function() {
                                         onclick="onMenuItemClick(event, 'flame_graphs',
                                         '${props.group}')">
                                           Flame graphs
-                                       </div>`).appendTo('#menu_items');
+                                       </div>`).appendTo('#thread_menu_items');
                                 }
                             } else {
                                 $(`<div class="menu_item"
                                     onclick="onMenuItemClick(event, '${k}', '${props.group}')">
                                      ${v.title}
-                                   </div>`).appendTo('#menu_items');
+                                   </div>`).appendTo('#thread_menu_items');
                             }
                         }
 
-                        $('#menu_block').css('top', props.pageY);
-                        $('#menu_block').css('left', props.pageX);
-                        $('#menu_block').outerHeight('auto');
-                        $('#menu_block').css('display', 'flex');
+                        $('#thread_menu_block').css('top', props.pageY);
+                        $('#thread_menu_block').css('left', props.pageX);
+                        $('#thread_menu_block').outerHeight('auto');
+                        $('#thread_menu_block').css('display', 'flex');
 
                         if (sampled_diff_dict[props.group] >
                             1.0 * parseFloat($('#runtime_diff_threshold_input').val()) / 100) {
@@ -451,20 +521,23 @@ $(document).on('change', '#results_combobox', function() {
                             $('#runtime_warning').hide();
                         }
 
-                        var height = $('#menu_block').outerHeight();
-                        var width = $('#menu_block').outerWidth();
+                        var height = $('#thread_menu_block').outerHeight();
+                        var width = $('#thread_menu_block').outerWidth();
 
                         if (props.pageY + height > $(window).outerHeight() - 30) {
-                            $('#menu_block').outerHeight(
+                            $('#thread_menu_block').outerHeight(
                                 $(window).outerHeight() - props.pageY - 30);
                         }
 
                         if (props.pageX + width > $(window).outerWidth() - 20) {
-                            $('#menu_block').css(
+                            $('#thread_menu_block').css(
                                 'left', props.pageX - width);
                         }
 
                         props.event.preventDefault();
+                        props.event.stopPropagation();
+
+                        onBackgroundClick(props.event, 'thread_menu_block');
                     }
                 });
             }
@@ -501,12 +574,6 @@ $(document).on('change', '#results_combobox', function() {
             });
     });
 });
-
-function createWindowDOM(analysis_type) {
-    if (analysis_type === 'flame_graphs') {
-        return $(flame_graph_window);
-    }
-}
 
 function setupWindow(window_obj, timeline_group_id, analysis_type) {
     var session = session_dict[$('#results_combobox').val()];
@@ -596,37 +663,58 @@ function setupWindow(window_obj, timeline_group_id, analysis_type) {
         }
 
         new ResizeObserver(onFlameGraphWindowResize).observe(window_obj[0]);
+    } else if (analysis_type === 'roofline') {
+        window_obj.find('.window_title').html('Cache-aware roofline model');
     }
 }
 
 function onMenuItemClick(event, analysis_type, timeline_group_id) {
-    $('#menu_block').hide();
-
+    $('#thread_menu_block').hide();
+    $('#general_analysis_menu_block').hide();
+    
     var session_id = $('#results_combobox').prop('selectedIndex');
     var index = 0;
-    var new_window_id =
-        `w_${session_id}_${analysis_type}_${timeline_group_id}_${index}`;
+    var new_window_id = undefined;
 
-    while (new_window_id in window_dict) {
-        index++;
+    if (timeline_group_id === undefined) {
+        new_window_id =
+            `w_${session_id}_${analysis_type}_${index}`;
+
+        while (new_window_id in window_dict) {
+            index++;
+            new_window_id =
+                `w_${session_id}_${analysis_type}_${index}`;
+        }
+    } else {
         new_window_id =
             `w_${session_id}_${analysis_type}_${timeline_group_id}_${index}`;
+
+        while (new_window_id in window_dict) {
+            index++;
+            new_window_id =
+                `w_${session_id}_${analysis_type}_${timeline_group_id}_${index}`;
+        }
     }
 
     window_dict[new_window_id] = {
         'type': analysis_type,
-        'data': {}
+        'data': {},
+        'collapsed': false
     };
 
     var new_window = createWindowDOM(analysis_type);
     new_window.css('top', event.pageY + 'px');
     new_window.css('left', event.pageX + 'px');
     new_window.attr('id', new_window_id);
-    new_window.attr('');
+    new_window.attr('onclick', 'changeFocus(\'' +
+                    new_window.attr('id') + '\')');
     new_window.attr('onmouseup', 'onWindowMouseUp(\'' +
                     new_window.attr('id') + '\')');
     new_window.find('.window_header').attr('onmousedown', 'startDrag(event, \'' +
                                            new_window.attr('id') + '\')');
+    new_window.find('.window_visibility').attr(
+        'onclick', 'onWindowVisibilityClick(event, \'' +
+            new_window.attr('id') + '\')');
     new_window.find('.window_close').attr(
         'onclick', 'onWindowCloseClick(event, \'' +
             new_window.attr('id') + '\')');
@@ -639,8 +727,91 @@ function onMenuItemClick(event, analysis_type, timeline_group_id) {
 
     new_window.appendTo('body');
 
+    changeFocus(new_window.attr('id'));
+
     setupWindow(new_window, timeline_group_id, analysis_type);
     loading.hide();
+}
+
+function changeFocus(window_id) {
+    var current_window = $('#' + window_id);
+    var window_header = current_window.find('.window_header');
+
+    if (current_focused_window_id !== window_id) {
+        if (window_id !== undefined) {
+            if (largest_z_index >= 5) {
+                var z_index_arr = [];
+
+                for (const k of Object.keys(window_dict)) {
+                    z_index_arr.push({'index': $('#' + k).css('z-index'),
+                                      'id': k});
+                }
+
+                z_index_arr.sort((a, b) => {
+                    if (a.index === undefined) {
+                        return -1;
+                    } else if (b.index === undefined) {
+                        return 1;
+                    } else {
+                        return a.index - b.index;
+                    }
+                });
+
+                var index = 1;
+                for (const obj of z_index_arr) {
+                    $('#' + obj.id).css('z-index', index);
+                    index += 1;
+                }
+
+                current_window.css('z-index', index);
+                largest_z_index = index;
+            } else {
+                largest_z_index += 1;
+                current_window.css('z-index', largest_z_index);
+            }
+
+            window_header.css('background-color', 'black');
+            window_header.css('color', 'white');
+            window_header.css('fill', 'white');
+        }
+
+        for (const k of Object.keys(window_dict)) {
+            if (k !== window_id) {
+                var unfocused_window = $('#' + k);
+                var unfocused_header = unfocused_window.find('.window_header');
+
+                unfocused_header.css('background-color', 'lightgray');
+                unfocused_header.css('color', 'black');
+                unfocused_header.css('fill', 'black');
+            }
+        }
+
+        current_focused_window_id = window_id;
+    }
+}
+
+function onWindowVisibilityClick(event, window_id) {
+    windowStopPropagation(event);
+
+    var current_window = $('#' + window_id);
+    var window_entry = window_dict[window_id];
+    var window_content = current_window.find('.window_content');
+    var window_header = current_window.find('.window_header');
+
+    if (!window_entry.collapsed) {
+        window_entry.collapsed = true;
+        window_entry.min_height = current_window.css('min-height');
+        window_entry.last_height = current_window.outerHeight();
+        current_window.css('min-height', '0');
+        current_window.css('resize', 'horizontal');
+        current_window.height(window_header.outerHeight());
+    } else {
+        window_entry.collapsed = false;
+        current_window.height(window_entry.last_height);
+        current_window.css('min-height', window_entry.min_height);
+        current_window.css('resize', 'both');
+        current_window.css('opacity', '');
+    }
 }
 
 function updateFlameGraph(window_id, data, always_change_height) {
@@ -752,17 +923,24 @@ function openFlameGraph(window_id, metric) {
     window_obj.find('.flamegraph')[0].scrollTop = 0;
 }
 
-function onBackgroundClick(event) {
-    if (!document.getElementById('menu_block').contains(event.target)) {
-        $('#menu_block').hide();
+function onBackgroundClick(event, exclude) {
+    if (exclude !== 'thread_menu_block' &&
+        !document.getElementById('thread_menu_block').contains(event.target)) {
+        $('#thread_menu_block').hide();
     }
 
-    if (!document.getElementById('settings_block').contains(event.target)) {
+    if (exclude !== 'settings_block' &&
+        !document.getElementById('settings_block').contains(event.target)) {
         $('#settings_block').hide();
+    }
+
+    if (exclude !== 'general_analysis_menu_block' &&
+        !document.getElementById('general_analysis_menu_block').contains(event.target)) {
+        $('#general_analysis_menu_block').hide();
     }
 }
 
-function onWindowCloseMouseDown(event) {
+function windowStopPropagation(event) {
     event.stopPropagation();
     event.preventDefault();
 }
@@ -867,7 +1045,7 @@ function downloadFlameGraph(window_id) {
     if (filename === null || filename === "") {
         return;
     }
-    
+
     var svg = window_obj.find('.flamegraph_svg').children()[0].cloneNode(true);
     var style = document.createElement('style');
 
@@ -939,8 +1117,8 @@ function insertValidPercentage(input) {
 }
 
 function startDrag(event, window_id) {
-    event.stopPropagation();
-    event.preventDefault();
+    windowStopPropagation(event);
+    changeFocus(window_id);
 
     var dragged = document.getElementById(window_id);
     var startX = event.offsetX;
@@ -983,8 +1161,29 @@ function onSettingsClick(event) {
 
     event.preventDefault();
     event.stopPropagation();
+
+    onBackgroundClick(event, 'settings_block');
 }
 
 function onGeneralAnalysesClick(event) {
+    var session = session_dict[$('#results_combobox').val()];
+    var metrics_dict = {'roofline': {'title': 'Cache-aware roofline model'}};
+    $('#general_analysis_menu_items').empty();
+    
+    for (const [k, v] of Object.entries(metrics_dict)) {
+        $(`<div class="menu_item"
+            onclick="onMenuItemClick(event, '${k}')">
+             ${v.title}
+           </div>`).appendTo('#general_analysis_menu_items');
+    }
 
+    $('#general_analysis_menu_block').css('top', event.clientY);
+    $('#general_analysis_menu_block').css('left', event.clientX);
+    $('#general_analysis_menu_block').outerHeight('auto');
+    $('#general_analysis_menu_block').css('display', 'flex');
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    onBackgroundClick(event, 'general_analysis_menu_block');
 }
