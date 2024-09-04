@@ -63,22 +63,34 @@ class Identifier:
 
         self._executor = match.group(1)
         self._name = match.group(2)
+        self._label = None
 
     def __str__(self):
         """
         Return a user-friendly string representation of the identifier in
-        form of "[<executor>] <profiled filename> (<year>-<month>-<day> <hour>:
-        <minute>:<second>)" (or without ":<second>" if the seconds part
-        of the time was not provided during the object construction).
+        form of "<label>: [<executor>] <profiled filename>
+        (<year>-<month>-<day> <hour>:<minute>:<second>)" (or without
+        ":<second>" if the seconds part of the time was not provided during
+        the object construction).
         """
         if self._second is None:
-            return f'[{self._executor}] {self._name} ' \
+            return f'{self._label}: [{self._executor}] {self._name} ' \
                 f'({self._year}-{self._month}-{self._day} ' \
                 f'{self._hour}:{self._minute})'
         else:
-            return f'[{self._executor}] {self._name} ' \
+            return f'{self._label}: [{self._executor}] {self._name} ' \
                 f'({self._year}-{self._month}-{self._day} ' \
                 f'{self._hour}:{self._minute}:{self._second})'
+
+    def set_label_if_none(self, label):
+        if self._label is None:
+            self._label = label
+
+        return self
+
+    @property
+    def label(self):
+        return self._label
 
     @property
     def year(self):
@@ -160,10 +172,14 @@ class ProfilingResults:
                                  0 if identifier.second is None
                                  else -identifier.second,
                                  identifier.executor,
-                                 identifier.name)))
+                                 identifier.name,
+                                 '' if identifier.label is None
+                                 else identifier.label)))
 
-        return list(map(lambda x: Identifier(x[0]),
-                        sorted(id_str_list, key=lambda x: x[1])))
+        return list(
+            map(lambda x:
+                Identifier(x[1][0]).set_label_if_none(str(x[0])),
+                enumerate(sorted(id_str_list, key=lambda x: x[1]))))
 
     def __init__(self, profiling_storage: str, identifier: str):
         """
@@ -202,6 +218,11 @@ class ProfilingResults:
 
         self._general_metrics = {}
 
+        if (self._path / 'processed' / 'roofline.csv').exists():
+            self._general_metrics['roofline'] = {
+                'title': 'Cache-aware roofline model'
+            }
+
     def get_general_analysis(self, analysis_type):
         """
         Get general analysis data of a specified type. If the type
@@ -218,8 +239,84 @@ class ProfilingResults:
             if not p.exists():
                 return None
 
+            data = {
+                'type': analysis_type,
+                'l1': None,
+                'l2': None,
+                'l3': None,
+                'models': []
+            }
+
             with p.open(mode='r', newline='') as f:
-                reader = csv.reader(p)
+                reader = csv.reader(f)
+
+                first_header = next(reader)
+
+                if len(first_header) != 21 or \
+                   [first_header[0], first_header[2],
+                    first_header[4], first_header[6]] + \
+                    first_header[9:] != \
+                    ['Name:', 'L1 Size:', 'L2 Size:',
+                     'L3 Size:', 'L1', 'L1', 'L2', 'L2',
+                     'L3', 'L3', 'DRAM', 'DRAM',
+                     'FP', 'FP', 'FP FMA', 'FP_FMA']:
+                    return None
+
+                second_header = next(reader)
+
+                if second_header != \
+                    ['Date', 'ISA', 'Precision', 'Threads',
+                     'Loads', 'Stores', 'Interleaved', 'DRAM Bytes',
+                     'FP Inst.', 'GB/s', 'I/Cycle', 'GB/s',
+                     'I/Cycle', 'GB/s', 'I/Cycle', 'GB/s',
+                     'I/Cycle', 'Gflop/s', 'I/Cycle', 'Gflop/s',
+                     'I/Cycle']:
+                    return None
+
+                data['l1'] = int(first_header[3])
+                data['l2'] = int(first_header[5])
+                data['l3'] = int(first_header[7])
+
+                for row in reader:
+                    if row is None or len(row) != 21:
+                        continue
+
+                    data['models'].append({
+                        'isa': row[1],
+                        'precision': row[2],
+                        'threads': row[3],
+                        'loads': row[4],
+                        'stores': row[5],
+                        'interleaved': row[6],
+                        'dram_bytes': row[7],
+                        'fp_inst': row[8],
+                        'l1': {
+                            'gbps': row[9],
+                            'instpc': row[10]
+                        },
+                        'l2': {
+                            'gbps': row[11],
+                            'instpc': row[12]
+                        },
+                        'l3': {
+                            'gbps': row[13],
+                            'instpc': row[14]
+                        },
+                        'dram': {
+                            'gbps': row[15],
+                            'instpc': row[16]
+                        },
+                        'fp': {
+                            'gflops': row[17],
+                            'instpc': row[18]
+                        },
+                        'fp_fma': {
+                            'gflops': row[19],
+                            'instpc': row[20]
+                        }
+                    })
+
+            return data
         else:
             return None
 

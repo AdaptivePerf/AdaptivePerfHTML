@@ -75,8 +75,13 @@ def post(identifier):
             elif 'perf_map' in request.values:
                 return results.get_perf_maps()
             elif 'general_analysis' in request.values:
-                return results.get_general_analysis(
+                json_data = results.get_general_analysis(
                     request.values['general_analysis'])
+
+                if json_data is None:
+                    return '', 404
+                else:
+                    return json_data
             elif 'pid' in request.values and 'tid' in request.values and \
                  'threshold' in request.values:
                 json_data = results.get_flame_graph(

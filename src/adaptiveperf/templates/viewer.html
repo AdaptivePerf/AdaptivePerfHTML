@@ -336,34 +336,61 @@
           margin:5px;
       }
 
-      .roofline_content {
+      .roofline_box {
           display:flex;
           flex-direction:row;
+          flex-grow:1;
+      }
+
+      .roofline_content {
+          flex-grow:1;
+          display:flex;
+          flex-direction:column;
       }
 
       .roofline_settings {
           display:flex;
           width:200px;
+          min-width:200px;
           flex-direction:column;
           margin-right:10px;
       }
 
-      .roofline_type {
-          display:flex;
+      .roofline_type, .roofline_bounds {
           margin-bottom:5px;
       }
 
       .roofline_type_select {
-          flex-grow:1;
-          margin-left:5px;
+          width:100%;
       }
 
-      .roofline_elements {
+      .roofline_details {
           flex-grow:1;
       }
 
       .roofline {
           flex-grow:1;
+      }
+
+      .roofline_l1_label {
+          font-weight:bold;
+          background-color:darkred;
+          color:white;
+          padding:2px;
+      }
+
+      .roofline_l2_label {
+          font-weight:bold;
+          background-color:darkgreen;
+          color:white;
+          padding:2px;
+      }
+
+      .roofline_l3_label {
+          font-weight:bold;
+          background-color:darkblue;
+          color:white;
+          padding:2px;
       }
     </style>
   </head>
@@ -379,7 +406,7 @@
             Please select a profiling session...
           </option>
           {% for x in ids %}
-          <option value="{{ x.value }}">{{ x }}</option>
+          <option value="{{ x.value }}" data-label="{{ x.label }}">{{ x }}</option>
           {% endfor %}
         </select>
         <div id="loading">

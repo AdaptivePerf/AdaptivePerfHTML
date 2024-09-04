@@ -29,26 +29,40 @@ function createWindowDOM(analysis_type) {
     </span>
   </div>
   <div class="roofline_content window_content">
-    <div class="roofline_settings">
-      <div class="roofline_type">
-        <span class="roofline_type_label">
-          Type:
-        </span>
-        <select name="roofline_type" class="roofline_type_select">
-
-        </select>
+    <div class="roofline_box">
+      <div class="roofline_settings">
+        <fieldset class="roofline_type">
+          <legend>Type</legend>
+          <select name="roofline_type" class="roofline_type_select">
+            <option value="" selected="selected" disabled="disabled">
+              Select...
+            </option>
+          </select>
+        </fieldset>
+        <fieldset class="roofline_bounds">
+          <legend>Bounds</legend>
+          <input type="checkbox" class="roofline_l1" checked="checked" />
+          <label class="roofline_l1_label">L1</label>
+          <input type="checkbox" class="roofline_l2" checked="checked" />
+          <label class="roofline_l2_label">L2</label>
+          <input type="checkbox" class="roofline_l3" checked="checked" />
+          <label class="roofline_l3_label">L3</label>
+        </fieldset>
+        <fieldset class="roofline_details">
+          <legend>Details</legend>
+          <span class="roofline_details_text">
+            <i>Please select a roofline type first.</i>
+          </span>
+        </fieldset>
       </div>
-      <fieldset class="roofline_elements">
-        <legend>Bounds</legend>
-      </fieldset>
-    </div>
-    <div class="roofline">
-      
+      <div class="roofline">
+
+      </div>
     </div>
   </div>
 </div>
 `;
-    
+
     const flame_graph_window = `
 <div class="window flamegraph_window">
   <div class="window_header">
@@ -119,7 +133,7 @@ function createWindowDOM(analysis_type) {
   </div>
 </div>
 `;
-    
+
     if (analysis_type === 'flame_graphs') {
         return $(flame_graph_window);
     } else if (analysis_type === 'roofline') {
@@ -145,6 +159,7 @@ var window_dict = {};
 // (Profiling) session directory structure:
 // {
 //     '<session ID>': {
+//         'label': ...,
 //         'result_cache': ...,
 //         'callchain_obj': ...,
 //         'callchain_dict': ...,
@@ -208,6 +223,7 @@ $(document).on('change', '#results_combobox', function() {
     $('#loading').show();
     $('#results_combobox option:selected').each(function() {
         var value = $(this).val();
+        var label = $(this).attr('data-label');
         var session_init = false;
 
         if (!(value in session_dict)) {
@@ -288,15 +304,7 @@ $(document).on('change', '#results_combobox', function() {
                     default_unit = 'ms';
                 }
 
-                item_dict[item.id] =
-                    [json.name + ' (' + json.pid_tid +
-                     '): ' + numf.format(default_runtime) +
-                     ' ' + default_unit + ' (sampled: ~' +
-                     numf.format(default_sampled_time) + ' ' + default_unit + ')',
-                     json.name + ' (' + json.pid_tid +
-                     '): ' + numf.format(json.runtime) +
-                     ' ms (sampled: ~' +
-                     numf.format(json.sampled_time) + ' ms)'];
+                item_dict[item.id] = json.name + ' (' + json.pid_tid + ')';
                 tooltip_dict[item.id] =
                     ['Runtime: ' +
                      numf.format(default_runtime) +
@@ -378,6 +386,7 @@ $(document).on('change', '#results_combobox', function() {
 
             function part3(init) {
                 if (init) {
+                    session_dict[value].label = label;
                     session_dict[value].item_list = [];
                     session_dict[value].group_list = [];
                     session_dict[value].item_dict = {};
@@ -575,7 +584,8 @@ $(document).on('change', '#results_combobox', function() {
     });
 });
 
-function setupWindow(window_obj, timeline_group_id, analysis_type) {
+function setupWindow(window_obj, timeline_group_id, analysis_type,
+                     loading_jquery) {
     var session = session_dict[$('#results_combobox').val()];
     if (analysis_type === 'flame_graphs') {
         window_obj.find('.flamegraph_time_ordered').attr(
@@ -590,15 +600,10 @@ function setupWindow(window_obj, timeline_group_id, analysis_type) {
         window_obj.find('.flamegraph_download').attr(
             'onclick', 'downloadFlameGraph(\'' + window_obj.attr('id') + '\')');
 
-        var runtime_select = 0;
-
-        if ($('#always_ms').prop('checked')) {
-            runtime_select = 1;
-        }
-
         window_obj.find('.window_title').html(
-            'Flame graphs for ' +
-                session.item_dict[timeline_group_id][runtime_select]);
+            '[Session: ' + session.label + '] ' +
+                'Flame graphs for ' +
+                session.item_dict[timeline_group_id]);
         window_obj.find('.flamegraph_metric').empty();
 
         var dict = session.metrics_dict[timeline_group_id];
@@ -627,6 +632,8 @@ function setupWindow(window_obj, timeline_group_id, analysis_type) {
             } else {
                 openFlameGraph(window_obj.attr('id'), 'walltime');
             }
+
+            loading_jquery.hide();
         } else {
             var pid_tid = timeline_group_id.split('_');
 
@@ -652,26 +659,177 @@ function setupWindow(window_obj, timeline_group_id, analysis_type) {
                     openFlameGraph(window_obj.attr('id'), 'walltime');
                 }
 
-                window_obj.find('.window_loading').hide();
+                loading_jquery.hide();
             }).fail(ajax_obj => {
                 window_dict[window_id].data.flamegraph_obj = undefined;
                 window_obj.find('.flamegraph_svg').hide();
                 window_obj.find('.flamegraph_search').val('');
                 window_obj.find('.no_flamegraph').show();
-                window_obj.find('.window_loading').hide();
+                loading_jquery.hide();
             });
         }
 
-        new ResizeObserver(onFlameGraphWindowResize).observe(window_obj[0]);
+        new ResizeObserver(onWindowResize).observe(window_obj[0]);
     } else if (analysis_type === 'roofline') {
-        window_obj.find('.window_title').html('Cache-aware roofline model');
+        window_obj.find('.window_title').html(
+            '[Session: ' + session.label + '] ' + 'Cache-aware roofline model');
+        window_obj.find('.roofline_type_select').attr(
+            'onchange', 'onRooflineTypeChange(event, ' +
+                '\'' + window_obj.attr('id') + '\')');
+        window_obj.find('.roofline_l1').attr(
+            'id', window_obj.attr('id') + '_l1');
+        window_obj.find('.roofline_l1').attr(
+            'onchange', 'onRooflineBoundsChange(\'' +
+                window_obj.attr('id') + '\')');
+        window_obj.find('.roofline_l2').attr(
+            'id', window_obj.attr('id') + '_l2');
+        window_obj.find('.roofline_l2').attr(
+            'onchange', 'onRooflineBoundsChange(\'' +
+                window_obj.attr('id') + '\')');
+        window_obj.find('.roofline_l3').attr(
+            'id', window_obj.attr('id') + '_l3');
+        window_obj.find('.roofline_l3').attr(
+            'onchange', 'onRooflineBoundsChange(\'' +
+                window_obj.attr('id') + '\')');
+        window_obj.find('.roofline_l1_label').attr(
+            'for', window_obj.find('.roofline_l1').attr('id'));
+        window_obj.find('.roofline_l2_label').attr(
+            'for', window_obj.find('.roofline_l2').attr('id'));
+        window_obj.find('.roofline_l3_label').attr(
+            'for', window_obj.find('.roofline_l3').attr('id'));
+
+        if (analysis_type in session.result_cache) {
+            openRooflinePlot(window_obj,
+                             session.result_cache[analysis_type]);
+            loading_jquery.hide();
+        } else {
+            $.ajax({
+                url: $('#block').attr('result_id') + '/',
+                method: 'POST',
+                dataType: 'json',
+                data: {general_analysis: analysis_type}
+            }).done(ajax_obj => {
+                session.result_cache[analysis_type] = ajax_obj;
+                window_dict[window_obj.attr('id')].data = ajax_obj;
+                openRooflinePlot(window_obj, ajax_obj);
+                loading_jquery.hide();
+            }).fail(ajax_obj => {
+                window.alert('Could not load the roofline model!');
+                loading_jquery.hide();
+                onWindowCloseClick(window_obj.attr('id'));
+            });
+        }
     }
+}
+
+function openRooflinePlot(window_obj, roofline_obj) {
+    for (var i = 0; i < roofline_obj.models.length; i++) {
+        window_obj.find('.roofline_type_select').append(
+            new Option(roofline_obj.models[i].isa, i));
+    }
+
+    var plot_container = window_obj.find('.roofline');
+    var plot_id = window_obj.attr('id') + '_roofline';
+    plot_container.attr('id', plot_id);
+
+    new ResizeObserver(onWindowResize).observe(window_obj[0]);
+}
+
+function onRooflineBoundsChange(window_id) {
+    var window_obj = $('#' + window_id);
+    var roofline_obj = window_dict[window_id].data;
+    var plot_data = [];
+
+    if (window_obj.find('.roofline_l1').prop('checked')) {
+        plot_data.push(roofline_obj.l1_func);
+    }
+
+    if (window_obj.find('.roofline_l2').prop('checked')) {
+        plot_data.push(roofline_obj.l2_func);
+    }
+
+    if (window_obj.find('.roofline_l3').prop('checked')) {
+        plot_data.push(roofline_obj.l3_func);
+    }
+
+    roofline_obj.plot_config.data = plot_data;
+    functionPlot(roofline_obj.plot_config);
+}
+
+function onRooflineTypeChange(event, window_id) {
+    var window_obj = $('#' + window_id);
+    var type_index = event.currentTarget.value;
+    var roofline_obj = window_dict[window_id].data;
+    var model = roofline_obj.models[type_index];
+
+    window_obj.find('.roofline_details_text').html(`
+        <b>Precision:</b> ${model.precision}<br />
+        <b>Threads:</b> ${model.threads}<br />
+        <b>Loads:</b> ${model.loads}<br />
+        <b>Stores:</b> ${model.stores}<br />
+        <b>Interleaved:</b> ${model.interleaved}<br />
+        <b>L1 bytes:</b> ${roofline_obj.l1}<br />
+        <b>L2 bytes:</b> ${roofline_obj.l2}<br />
+        <b>L3 bytes:</b> ${roofline_obj.l3}<br />
+        <b>DRAM bytes:</b> ${model.dram_bytes}
+    `);
+
+    roofline_obj.l1_func = {
+        fn: `min(x * ${model.l1.gbps}, ${model.fp_fma.gflops})`,
+        color: 'darkred'
+    };
+
+    roofline_obj.l2_func = {
+        fn: `min(x * ${model.l2.gbps}, ${model.fp_fma.gflops})`,
+        color: 'darkgreen'
+    };
+
+    roofline_obj.l3_func = {
+        fn: `min(x * ${model.l3.gbps}, ${model.fp_fma.gflops})`,
+        color: 'darkblue'
+    };
+
+    var plot_data = [];
+    var turning_x = model.fp_fma.gflops / Math.min(
+        model.l1.gbps, model.l2.gbps, model.l3.gbps);
+
+    if (window_obj.find('.roofline_l1').prop('checked')) {
+        plot_data.push(roofline_obj.l1_func);
+    }
+
+    if (window_obj.find('.roofline_l2').prop('checked')) {
+        plot_data.push(roofline_obj.l2_func);
+    }
+
+    if (window_obj.find('.roofline_l3').prop('checked')) {
+        plot_data.push(roofline_obj.l3_func);
+    }
+
+    var container = window_obj.find('.roofline');
+
+    roofline_obj.plot_config = {
+        target: '#' + window_id + '_roofline',
+        width: container.width() - 10,
+        height: container.height() - 10,
+        xAxis: {
+            label: 'Arithmetic intensity (Gflop/GB)',
+            domain: [0, 1.5 * turning_x]
+        },
+        yAxis: {
+            label: 'Performance (Gflop/s)',
+            domain: [0, 1.25 * model.fp_fma.gflops]
+        },
+        disableZoom: true,
+        data: plot_data
+    };
+
+    functionPlot(roofline_obj.plot_config);
 }
 
 function onMenuItemClick(event, analysis_type, timeline_group_id) {
     $('#thread_menu_block').hide();
     $('#general_analysis_menu_block').hide();
-    
+
     var session_id = $('#results_combobox').prop('selectedIndex');
     var index = 0;
     var new_window_id = undefined;
@@ -699,6 +857,7 @@ function onMenuItemClick(event, analysis_type, timeline_group_id) {
     window_dict[new_window_id] = {
         'type': analysis_type,
         'data': {},
+        'being_resized': false,
         'collapsed': false
     };
 
@@ -716,7 +875,7 @@ function onMenuItemClick(event, analysis_type, timeline_group_id) {
         'onclick', 'onWindowVisibilityClick(event, \'' +
             new_window.attr('id') + '\')');
     new_window.find('.window_close').attr(
-        'onclick', 'onWindowCloseClick(event, \'' +
+        'onclick', 'onWindowCloseClick(\'' +
             new_window.attr('id') + '\')');
 
     var loading = $('#loading').clone();
@@ -729,8 +888,7 @@ function onMenuItemClick(event, analysis_type, timeline_group_id) {
 
     changeFocus(new_window.attr('id'));
 
-    setupWindow(new_window, timeline_group_id, analysis_type);
-    loading.hide();
+    setupWindow(new_window, timeline_group_id, analysis_type, loading);
 }
 
 function changeFocus(window_id) {
@@ -824,7 +982,7 @@ function updateFlameGraph(window_id, data, always_change_height) {
             if (flamegraph_svg !== undefined) {
                 var target_height = flamegraph_svg.getBBox().height;
 
-                if (always_change_height || target_height > window_obj.find('.flamegraph_svg').height()) {
+                if (always_change_height || target_height > window_obj.find('.flamegraph_svg').outerHeight()) {
                     window_obj.find('.flamegraph_svg').height(target_height);
                     flamegraph_svg.setAttribute('height', target_height);
                 }
@@ -909,7 +1067,7 @@ function openFlameGraph(window_id, metric) {
     window_obj.find('.flamegraph_svg').attr(
         'id', window_obj.attr('id') + '_flamegraph_svg');
     window_obj.find('.flamegraph_svg').show();
-    flamegraph_obj.width(window_obj.find('.flamegraph').width());
+    flamegraph_obj.width(window_obj.find('.flamegraph').outerWidth());
     d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum(structuredClone(
         result_obj[metric][
             window_obj.find('.flamegraph_time_ordered').prop('checked') ? 1 : 0])).call(
@@ -917,7 +1075,7 @@ function openFlameGraph(window_id, metric) {
     window_dict[window_id].data.total =
         d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum().data['value'];
     updateFlameGraph(window_id, null, true);
-    flamegraph_obj.width(window_obj.find('.flamegraph_svg').width());
+    flamegraph_obj.width(window_obj.find('.flamegraph_svg').outerWidth());
     flamegraph_obj.update();
 
     window_obj.find('.flamegraph')[0].scrollTop = 0;
@@ -945,12 +1103,12 @@ function windowStopPropagation(event) {
     event.preventDefault();
 }
 
-function onWindowCloseClick(event, window_id) {
+function onWindowCloseClick(window_id) {
     $('#' + window_id).remove();
     delete window_dict[window_id];
 }
 
-function onMetricChange(window_id, event) {
+function onMetricChange(event, window_id) {
     var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
     var result_obj = window_dict[window_id].data.result_obj;
     if ($('#result_background').is(':visible') ||
@@ -1002,15 +1160,23 @@ function onSearchQueryChange(window_id, value) {
 
 function onWindowMouseUp(window_id) {
     var window_obj = $('#' + window_id);
-    var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
-    if (window_dict[window_id].data.being_resized) {
-        flamegraph_obj.width(window_obj.find('.flamegraph_svg').width());
-        flamegraph_obj.update();
-        window_dict[window_id].data.being_resized = false;
+    if (window_dict[window_id].being_resized) {
+        if (window_dict[window_id].type === 'flame_graphs') {
+            var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
+            flamegraph_obj.width(window_obj.find('.flamegraph_svg').outerWidth());
+            flamegraph_obj.update();
+        } else if (window_dict[window_id].type === 'roofline' &&
+                   window_dict[window_id].data.plot_config !== undefined) {
+            var plot_config = window_dict[window_id].data.plot_config;
+            plot_config.width = window_obj.find('.roofline').outerWidth();
+            plot_config.height = window_obj.find('.roofline').outerHeight();
+            functionPlot(plot_config);
+        }
+        window_dict[window_id].being_resized = false;
     }
 }
 
-function onFlameGraphWindowResize(windows) {
+function onWindowResize(windows) {
     for (var window of windows) {
         var target = window.target;
 
@@ -1028,8 +1194,9 @@ function onFlameGraphWindowResize(windows) {
             continue;
         }
 
-        if (window_dict[window_id].data.flamegraph_obj !== undefined) {
-            window_dict[window_id].data.being_resized = true;
+        if (window_dict[window_id].data.flamegraph_obj !== undefined ||
+            window_dict[window_id].type === 'roofline') {
+            window_dict[window_id].being_resized = true;
         }
     }
 }
@@ -1167,9 +1334,9 @@ function onSettingsClick(event) {
 
 function onGeneralAnalysesClick(event) {
     var session = session_dict[$('#results_combobox').val()];
-    var metrics_dict = {'roofline': {'title': 'Cache-aware roofline model'}};
+    var metrics_dict = session.general_metrics_dict;
     $('#general_analysis_menu_items').empty();
-    
+
     for (const [k, v] of Object.entries(metrics_dict)) {
         $(`<div class="menu_item"
             onclick="onMenuItemClick(event, '${k}')">
