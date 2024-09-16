@@ -41,12 +41,21 @@ function createWindowDOM(analysis_type) {
         </fieldset>
         <fieldset class="roofline_bounds">
           <legend>Bounds</legend>
-          <input type="checkbox" class="roofline_l1" checked="checked" />
-          <label class="roofline_l1_label">L1</label>
-          <input type="checkbox" class="roofline_l2" checked="checked" />
-          <label class="roofline_l2_label">L2</label>
-          <input type="checkbox" class="roofline_l3" checked="checked" />
-          <label class="roofline_l3_label">L3</label>
+          <div class="roofline_l1">
+            <b>L1:</b> on
+          </div>
+          <div class="roofline_l2">
+            <b>L2:</b> on
+          </div>
+          <div class="roofline_l3">
+            <b>L3:</b> on
+          </div>
+          <div class="roofline_dram">
+            <b>DRAM:</b> on
+          </div>
+          <div class="roofline_fp" title="There are two performance ceilings: FP_FMA (floating-point ops with FMA instructions) and FP (floating-point ops without FMA instructions). FP_FMA is used for plotting L1/L2/L3/DRAM bounds, but the lower FP ceiling can be plotted as an extra dashed black line since not all programs use FMA.">
+            <b>FP:</b> on
+          </div>
         </fieldset>
         <fieldset class="roofline_details">
           <legend>Details</legend>
@@ -96,7 +105,7 @@ function createWindowDOM(analysis_type) {
     <div class="flamegraph_choice">
       <div class="flamegraph_metric_choice">
         Metric:
-        <select name="metric" class="flamegraph_metric" onchange="onMetricChange(event)">
+        <select name="metric" class="flamegraph_metric">
 
         </select>
         <input type="checkbox" class="flamegraph_time_ordered" />
@@ -597,6 +606,8 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
                 'this.value)');
         window_obj.find('.flamegraph_time_ordered').attr(
             'onchange', 'onTimeOrderedChange(\'' + window_obj.attr('id') + '\', event)');
+        window_obj.find('.flamegraph_metric').attr(
+            'onchange', 'onMetricChange(\'' + window_obj.attr('id') + '\', event)');
         window_obj.find('.flamegraph_download').attr(
             'onclick', 'downloadFlameGraph(\'' + window_obj.attr('id') + '\')');
 
@@ -677,28 +688,24 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
             'onchange', 'onRooflineTypeChange(event, ' +
                 '\'' + window_obj.attr('id') + '\')');
         window_obj.find('.roofline_l1').attr(
-            'id', window_obj.attr('id') + '_l1');
-        window_obj.find('.roofline_l1').attr(
-            'onchange', 'onRooflineBoundsChange(\'' +
+            'onclick', 'onRooflineBoundsChange(\'l1\', \'' +
                 window_obj.attr('id') + '\')');
         window_obj.find('.roofline_l2').attr(
-            'id', window_obj.attr('id') + '_l2');
-        window_obj.find('.roofline_l2').attr(
-            'onchange', 'onRooflineBoundsChange(\'' +
+            'onclick', 'onRooflineBoundsChange(\'l2\', \'' +
                 window_obj.attr('id') + '\')');
         window_obj.find('.roofline_l3').attr(
-            'id', window_obj.attr('id') + '_l3');
-        window_obj.find('.roofline_l3').attr(
-            'onchange', 'onRooflineBoundsChange(\'' +
+            'onclick', 'onRooflineBoundsChange(\'l3\', \'' +
                 window_obj.attr('id') + '\')');
-        window_obj.find('.roofline_l1_label').attr(
-            'for', window_obj.find('.roofline_l1').attr('id'));
-        window_obj.find('.roofline_l2_label').attr(
-            'for', window_obj.find('.roofline_l2').attr('id'));
-        window_obj.find('.roofline_l3_label').attr(
-            'for', window_obj.find('.roofline_l3').attr('id'));
+        window_obj.find('.roofline_dram').attr(
+            'onclick', 'onRooflineBoundsChange(\'dram\', \'' +
+                window_obj.attr('id') + '\')');
+        window_obj.find('.roofline_fp').attr(
+            'onclick', 'onRooflineBoundsChange(\'fp\', \'' +
+                window_obj.attr('id') + '\')');
 
         if (analysis_type in session.result_cache) {
+            window_dict[window_obj.attr('id')].data =
+                session.result_cache[analysis_type];
             openRooflinePlot(window_obj,
                              session.result_cache[analysis_type]);
             loading_jquery.hide();
@@ -732,28 +739,89 @@ function openRooflinePlot(window_obj, roofline_obj) {
     var plot_id = window_obj.attr('id') + '_roofline';
     plot_container.attr('id', plot_id);
 
+    roofline_obj.bounds = {
+        'l1': true,
+        'l2': true,
+        'l3': true,
+        'dram': true,
+        'fp': true
+    };
+
     new ResizeObserver(onWindowResize).observe(window_obj[0]);
 }
 
-function onRooflineBoundsChange(window_id) {
+function onRooflineBoundsChange(bound, window_id) {
     var window_obj = $('#' + window_id);
+    var plot_present = window_obj.find('.roofline_type_select').val() != null;
     var roofline_obj = window_dict[window_id].data;
+    roofline_obj.bounds[bound] = !roofline_obj.bounds[bound];
+
+    var model = plot_present ?
+        roofline_obj.models[
+            window_obj.find('.roofline_type_select').val()] : undefined;
     var plot_data = [];
+    var for_turning_x = [];
 
-    if (window_obj.find('.roofline_l1').prop('checked')) {
-        plot_data.push(roofline_obj.l1_func);
+    if (roofline_obj.bounds.l1) {
+        if (plot_present) {
+            plot_data.push(roofline_obj.l1_func);
+            for_turning_x.push(model.l1.gbps);
+        }
+
+        window_obj.find('.roofline_l1').html('<b>L1:</b> on');
+    } else {
+        window_obj.find('.roofline_l1').html('<b>L1:</b> off');
     }
 
-    if (window_obj.find('.roofline_l2').prop('checked')) {
-        plot_data.push(roofline_obj.l2_func);
+    if (roofline_obj.bounds.l2) {
+        if (plot_present) {
+            plot_data.push(roofline_obj.l2_func);
+            for_turning_x.push(model.l2.gbps);
+        }
+
+        window_obj.find('.roofline_l2').html('<b>L2:</b> on');
+    } else {
+        window_obj.find('.roofline_l2').html('<b>L2:</b> off');
     }
 
-    if (window_obj.find('.roofline_l3').prop('checked')) {
-        plot_data.push(roofline_obj.l3_func);
+    if (roofline_obj.bounds.l3) {
+        if (plot_present) {
+            plot_data.push(roofline_obj.l3_func);
+            for_turning_x.push(model.l3.gbps);
+        }
+
+        window_obj.find('.roofline_l3').html('<b>L3:</b> on');
+    } else {
+        window_obj.find('.roofline_l3').html('<b>L3:</b> off');
     }
 
-    roofline_obj.plot_config.data = plot_data;
-    functionPlot(roofline_obj.plot_config);
+    if (roofline_obj.bounds.dram) {
+        if (plot_present) {
+            plot_data.push(roofline_obj.dram_func);
+            for_turning_x.push(model.dram.gbps);
+        }
+
+        window_obj.find('.roofline_dram').html('<b>DRAM:</b> on');
+    } else {
+        window_obj.find('.roofline_dram').html('<b>DRAM:</b> off');
+    }
+
+    if (roofline_obj.bounds.fp) {
+        if (plot_present) {
+            plot_data.push(roofline_obj.fp_func);
+        }
+
+        window_obj.find('.roofline_fp').html('<b>FP:</b> on');
+    } else {
+        window_obj.find('.roofline_fp').html('<b>FP:</b> off');
+    }
+
+    if (plot_present) {
+        var turning_x = model.fp_fma.gflops / Math.min(...for_turning_x);
+        roofline_obj.plot_config.data = plot_data;
+        roofline_obj.plot_config.xAxis.domain = [0, 1.5 * turning_x];
+        functionPlot(roofline_obj.plot_config);
+    }
 }
 
 function onRooflineTypeChange(event, window_id) {
@@ -789,21 +857,46 @@ function onRooflineTypeChange(event, window_id) {
         color: 'darkblue'
     };
 
+    roofline_obj.dram_func = {
+        fn: `min(x * ${model.dram.gbps}, ${model.fp_fma.gflops})`,
+        color: 'darkgrey'
+    };
+
+    roofline_obj.fp_func = {
+        fn: model.fp.gflops,
+        color: 'black',
+        graphType: 'scatter',
+        nSamples: 100
+    }
+
     var plot_data = [];
-    var turning_x = model.fp_fma.gflops / Math.min(
-        model.l1.gbps, model.l2.gbps, model.l3.gbps);
+    var for_turning_x = [];
 
-    if (window_obj.find('.roofline_l1').prop('checked')) {
+    if (roofline_obj.bounds.l1) {
         plot_data.push(roofline_obj.l1_func);
+        for_turning_x.push(model.l1.gbps);
     }
 
-    if (window_obj.find('.roofline_l2').prop('checked')) {
+    if (roofline_obj.bounds.l2) {
         plot_data.push(roofline_obj.l2_func);
+        for_turning_x.push(model.l2.gbps);
     }
 
-    if (window_obj.find('.roofline_l3').prop('checked')) {
+    if (roofline_obj.bounds.l3) {
         plot_data.push(roofline_obj.l3_func);
+        for_turning_x.push(model.l3.gbps);
     }
+
+    if (roofline_obj.bounds.dram) {
+        plot_data.push(roofline_obj.dram_func);
+        for_turning_x.push(model.dram.gbps);
+    }
+
+    if (roofline_obj.bounds.fp) {
+        plot_data.push(roofline_obj.fp_func);
+    }
+
+    var turning_x = model.fp_fma.gflops / Math.min(...for_turning_x);
 
     var container = window_obj.find('.roofline');
 
@@ -812,8 +905,8 @@ function onRooflineTypeChange(event, window_id) {
         width: container.width() - 10,
         height: container.height() - 10,
         xAxis: {
-            label: 'Arithmetic intensity (Gflop/GB)',
-            domain: [0, 1.5 * turning_x]
+            label: 'Arithmetic intensity (flop/byte)',
+            domain: [0.00390625, 1.5 * turning_x]
         },
         yAxis: {
             label: 'Performance (Gflop/s)',
@@ -897,7 +990,7 @@ function changeFocus(window_id) {
 
     if (current_focused_window_id !== window_id) {
         if (window_id !== undefined) {
-            if (largest_z_index >= 5) {
+            if (largest_z_index >= 10000) {
                 var z_index_arr = [];
 
                 for (const k of Object.keys(window_dict)) {
@@ -1108,24 +1201,21 @@ function onWindowCloseClick(window_id) {
     delete window_dict[window_id];
 }
 
-function onMetricChange(event, window_id) {
-    var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
+function onMetricChange(window_id, event) {
+    var window_obj = $('#' + window_id);
     var result_obj = window_dict[window_id].data.result_obj;
-    if ($('#result_background').is(':visible') ||
-        flamegraph_obj !== undefined) {
-        var metric = event.currentTarget.value;
+    var metric = event.currentTarget.value;
 
-        window_dict[window_id].data.flamegraph_obj = undefined;
-        $('#time_ordered').prop('checked', false);
+    window_dict[window_id].data.flamegraph_obj = undefined;
+    window_obj.find('.flamegraph_time_ordered').prop('checked', false);
 
-        if (metric in result_obj) {
-            openFlameGraph(window_id, metric);
-        } else {
-            $('#search').val('');
-            $('#search_results').hide();
-            $('#svg').hide();
-            $('#no_flamegraph').show();
-        }
+    if (metric in result_obj) {
+        openFlameGraph(window_id, metric);
+    } else {
+        window_obj.find('.flamegraph_search').val('');
+        window_obj.find('.flamegraph_search_results').hide();
+        window_obj.find('.flamegraph_svg').hide();
+        window_obj.find('.no_flamegraph').show();
     }
 }
 
@@ -1167,9 +1257,11 @@ function onWindowMouseUp(window_id) {
             flamegraph_obj.update();
         } else if (window_dict[window_id].type === 'roofline' &&
                    window_dict[window_id].data.plot_config !== undefined) {
+            window_obj.find('.roofline').html('');
+
             var plot_config = window_dict[window_id].data.plot_config;
-            plot_config.width = window_obj.find('.roofline').outerWidth();
-            plot_config.height = window_obj.find('.roofline').outerHeight();
+            plot_config.width = window_obj.find('.roofline').outerWidth() - 10;
+            plot_config.height = window_obj.find('.roofline').outerHeight() - 10;
             functionPlot(plot_config);
         }
         window_dict[window_id].being_resized = false;
@@ -1194,9 +1286,11 @@ function onWindowResize(windows) {
             continue;
         }
 
-        if (window_dict[window_id].data.flamegraph_obj !== undefined ||
-            window_dict[window_id].type === 'roofline') {
+        if (window_dict[window_id].data.flamegraph_obj !== undefined) {
             window_dict[window_id].being_resized = true;
+        } else if (window_dict[window_id].type === 'roofline') {
+            window_dict[window_id].being_resized = true;
+            $(target).find('.roofline').html('');
         }
     }
 }
@@ -1205,6 +1299,12 @@ function onWindowResize(windows) {
 // (originally CC BY-SA 4.0, covered by GNU GPL v3 here)
 function downloadFlameGraph(window_id) {
     var window_obj = $('#' + window_id);
+    var flamegraph_obj = window_dict[window_id].data.flamegraph_obj;
+
+    if (flamegraph_obj === undefined) {
+        return;
+    }
+
     var filename = window.prompt(
         'What filename do you want? ' +
             '(".png" will be added automatically)');
