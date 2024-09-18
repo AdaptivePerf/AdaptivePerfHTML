@@ -1,11 +1,10 @@
-
 #include "tree_parse.hpp"
 #include <vector>
 #include <string>
 #include <unordered_map>
 
-TreeNode* prune_tree(const TreeNode* node, uint64_t threshold_left,
-                    uint64_t threshold_right, const std::string counter_name) {
+TreeNode* prune_tree(const TreeNode *node, uint64_t threshold_left,
+                     uint64_t threshold_right, const std::string counter_name) {
   TreeNode* pruned_node = new TreeNode(*node);
 
   pruned_node->children.clear();
@@ -44,14 +43,14 @@ TreeNode* prune_tree(const TreeNode* node, uint64_t threshold_left,
     }
     pruned_node->value -= extra_value;
     if (pruned_node->value == 0) {
-      return {}; //no value, means it would not be displayed
+      return {}; // no value, means it would not be displayed
     }
   } else {
     pruned_node->value = 0;
 
     for (const auto &child : node->children) {
       TreeNode* pruned_child = prune_tree(child, threshold_left, threshold_right,
-                                         counter_name);
+                                          counter_name);
 
       // add the child if after extra counters (outside timeinterval)
       // where substracted, final value > 0
@@ -70,47 +69,48 @@ TreeNode* prune_tree(const TreeNode* node, uint64_t threshold_left,
   return pruned_node;
 }
 
-void mergeNodes(TreeNode &target, const TreeNode &source) {
-    target.value += source.value;
-    target.samples.clear();
-    target.children.insert(target.children.end(), source.children.begin(), source.children.end());
+void merge_nodes(TreeNode &target, const TreeNode &source) {
+  target.value += source.value;
+  target.samples.clear();
+  target.children.insert(target.children.end(), source.children.begin(),
+                         source.children.end());
 }
 
-void mergeTree(TreeNode &root) {
-    std::unordered_map<std::string, TreeNode *> mergedChildren;
+void merge_tree(TreeNode &root) {
+  std::unordered_map<std::string, TreeNode *> merged_children;
 
-    for (auto it = root.children.begin(); it != root.children.end(); ) {
-        if (mergedChildren.find((*it)->name) != mergedChildren.end()) {
-            mergeNodes(*mergedChildren[(*it)->name], *(*it));
-            it = root.children.erase(it); 
-        } else {
-            mergedChildren[(*it)->name] = *it;
-            ++it; 
-        }
+  for (auto it = root.children.begin(); it != root.children.end(); ) {
+    if (merged_children.find((*it)->name) != merged_children.end()) {
+      merge_nodes(*merged_children[(*it)->name], *(*it));
+      it = root.children.erase(it);
+    } else {
+      merged_children[(*it)->name] = *it;
+      ++it;
     }
-    for (auto &child : root.children) {
-        mergeTree(*child);
-    }
+  }
+  for (auto &child : root.children) {
+    merge_tree(*child);
+  }
 }
 
+TreeNode* slice_flame_graph(const TreeNode *node, uint64_t threshold_left,
+                            uint64_t threshold_right,
+                            const std::string counter_name, bool time_ordered) {
 
-TreeNode* slice_flame_graph(const TreeNode* node, uint64_t threshold_left,
-                    uint64_t threshold_right, const std::string counter_name, bool time_ordered){
+  TreeNode* pruned_tree = prune_tree(node, threshold_left,
+                                     threshold_right, counter_name);
 
-      TreeNode* pruned_tree = prune_tree(node, threshold_left,
-                    threshold_right, counter_name);
-
-      if(!time_ordered){
-         mergeTree(*pruned_tree);
-      }
-      return pruned_tree;     
+  if(!time_ordered){
+    merge_tree(*pruned_tree);
+  }
+  return pruned_tree;
 }
 
-void deleteTree(TreeNode* node) {
-    if (node) {
-        for (auto child : node->children) {
-            deleteTree(child);
-        }
-        delete node;
+void delete_tree(TreeNode *node) {
+  if (node) {
+    for (auto child : node->children) {
+      delete_tree(child);
     }
+    delete node;
+  }
 }

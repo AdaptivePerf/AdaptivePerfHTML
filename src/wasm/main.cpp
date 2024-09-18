@@ -5,8 +5,8 @@
 
 using json = nlohmann::json;
 
-TreeNode* parse_json_to_tree(const json &j_node) {
-  TreeNode* node = new TreeNode();
+TreeNode *parse_json_to_tree(const json &j_node) {
+  TreeNode *node = new TreeNode();
   node->name = j_node.value("name", "");
   node->value = 0;
 
@@ -87,7 +87,6 @@ int main() {
   uint64_t start_time = 0;
 
   if (j.contains("first_time")) {
-
     start_time = j["first_time"].get<uint64_t>();
   }
 
@@ -95,8 +94,8 @@ int main() {
 
   if (j.contains(counter_tree_key) && j[counter_tree_key].size() > 1) {
     // time ordered json
-    TreeNode* second_node = parse_json_to_tree(j[counter_tree_key][1]);
-    TreeNode* first_node = parse_json_to_tree(j[counter_tree_key][0]);
+    TreeNode *second_node = parse_json_to_tree(j[counter_tree_key][1]);
+    TreeNode *first_node = parse_json_to_tree(j[counter_tree_key][0]);
 
     // std::cout << "first time " << start_time << std::endl;
     uint64_t threshold_left =  0; // - start_time if needed
@@ -104,12 +103,11 @@ int main() {
 
 
     TreeNode* pruned_tree = slice_flame_graph(second_node, threshold_left,
-                                      threshold_right, counter_tree_key, false);
+                                              threshold_right, counter_tree_key,
+                                              false);
 
     json pruned_tree_json = tree_to_json(*pruned_tree);
     save_json_to_file(pruned_tree_json, "pruned_tree.json");
-
-
 
     // tree that only includes nodes which overlap with the time period
     // between with two thresholds
@@ -124,47 +122,47 @@ int main() {
     std::cout << "\nPruned Tree :\n";
     print_tree(*pruned_tree);
 
-
-    deleteTree(pruned_tree);
-    deleteTree(first_node);
-    deleteTree(second_node);
+    delete_tree(pruned_tree);
+    delete_tree(first_node);
+    delete_tree(second_node);
 
     // Test merging:
-     
     TreeNode* root1 = new TreeNode{
       "root", 0, false, {}, {
-          new TreeNode{"A", 10, false, {{100, 1}, {200, 2}}, 
-              {new TreeNode{"X", 5, true, {{300, 3}}, {}}, 
-              new TreeNode{"Y", 10, false, {{400, 4}}, {}}}},
-          new TreeNode{"B", 20, true, {{600, 6}}, {}},
-          new TreeNode{"A", 5, false, {{900, 9}}, 
-              {new TreeNode{"X", 4, false, {{1000, 10}}, {}}, 
-              new TreeNode{"Y", 2, true, {{1100, 11}}, {}}}},
+        new TreeNode{"A", 10, false, {{100, 1}, {200, 2}},
+                     {new TreeNode{"X", 5, true, {{300, 3}}, {}},
+                      new TreeNode{"Y", 10, false, {{400, 4}}, {}}}},
+        new TreeNode{"B", 20, true, {{600, 6}}, {}},
+        new TreeNode{"A", 5, false, {{900, 9}},
+                     {new TreeNode{"X", 4, false, {{1000, 10}}, {}},
+                      new TreeNode{"Y", 2, true, {{1100, 11}}, {}}}},
       }
     };
 
     TreeNode* root2 = new TreeNode{
-        "root", 0, false, {}, {
-            new TreeNode{"A", 10, false, {{100, 1}, {200, 2}}, 
-                {new TreeNode{"X", 5, true, {{300, 3}}, 
-                    {new TreeNode{"Z", 10, false, {{401, 4}}, {}}}}, 
-                new TreeNode{"Y", 10, false, {{400, 4}}, 
-                    {new TreeNode{"Z", 10, false, {{400, 4}}, {}}}}}},
-            new TreeNode{"B", 20, true, {{600, 6}}, 
-                {new TreeNode{"Z", 10, false, {{402, 4}}, {}}}},
-            new TreeNode{"A", 5, false, {{900, 9}}, 
-                {new TreeNode{"X", 4, false, {{1000, 10}}, 
-                    {new TreeNode{"Z", 10, false, {{404, 4}}, {}}}}, 
-                new TreeNode{"Y", 2, true, {{1100, 11}}, 
-                    {new TreeNode{"Z", 10, false, {{405, 4}}, {}}}}}},
-        }
+      "root", 0, false, {}, {
+        new TreeNode{"A", 10, false, {{100, 1}, {200, 2}},
+                     {new TreeNode{"X", 5, true, {{300, 3}},
+                                   {new TreeNode{"Z", 10, false, {{401, 4}}, {}}}},
+                      new TreeNode{"Y", 10, false, {{400, 4}},
+                                   {new TreeNode{"Z", 10, false, {{400, 4}}, {}}}}}},
+        new TreeNode{"B", 20, true, {{600, 6}},
+                     {new TreeNode{"Z", 10, false, {{402, 4}}, {}}}},
+        new TreeNode{"A", 5, false, {{900, 9}},
+                     {new TreeNode{"X", 4, false, {{1000, 10}},
+                                   {new TreeNode{"Z", 10, false, {{404, 4}}, {}}}},
+                      new TreeNode{"Y", 2, true, {{1100, 11}},
+                                   {new TreeNode{"Z", 10, false, {{405, 4}}, {}}}}}},
+      }
     };
 
+    TreeNode *pruned_tree1 = slice_flame_graph(root1, threshold_left,
+                                               threshold_right,
+                                               counter_tree_key, false);
+    TreeNode *pruned_tree2 = slice_flame_graph(root2, threshold_left,
+                                               threshold_right,
+                                               counter_tree_key, false);
 
-    TreeNode* pruned_tree1 = slice_flame_graph(root1, threshold_left, threshold_right, counter_tree_key, false);
-    TreeNode* pruned_tree2 = slice_flame_graph(root2, threshold_left, threshold_right, counter_tree_key, false);
-
-    
     std::cout  << "Not merged 1 "<< std::endl;
     print_tree(*root1);
 
@@ -179,11 +177,10 @@ int main() {
     std::cout  << "Merged 2 "<< std::endl;
     print_tree(*pruned_tree2);
 
-    deleteTree(pruned_tree1);
-    deleteTree(pruned_tree2);
-    deleteTree(root1);
-    deleteTree(root2);
-
+    delete_tree(pruned_tree1);
+    delete_tree(pruned_tree2);
+    delete_tree(root1);
+    delete_tree(root2);
   } else {
     std::cerr << "The walltime array does not have at least two elements." << std::endl;
   }
