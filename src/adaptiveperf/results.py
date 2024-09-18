@@ -181,7 +181,10 @@ class ProfilingResults:
         with (self._path / 'processed' / 'metadata.json').open(mode='r') as f:
             self._metadata = json.load(f)
 
-        metrics_path = self._path / 'out' / 'event_dict.data'
+        metrics_path = self._path / 'processed' / 'event_dict.data'
+
+        if not metrics_path.exists():
+            metrics_path = self._path / 'out' / 'event_dict.data'
 
         self._metrics = {}
 
