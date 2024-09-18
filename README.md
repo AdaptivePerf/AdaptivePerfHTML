@@ -43,3 +43,7 @@ After opening the website, follow this getting started guide:
 5. Right-click a thread/process block to check the exact runtime of the thread/process (as measured between the relevant start and exit syscalls), the ```perf```-sampled runtime, and the stack trace of a function which spawned the thread/process. If the difference between the sampled and exact runtime is significant (the threshold can be adjusted by the user at the website, above the timeline view), the sampled runtime will be shown in red.
 6. Double-click a thread/process block to open the browser of thread/process-specific profiling results. There, you can select the analysis type you want to see (only flame graphs at the moment).
 7. For flame graphs, you can change the profiling metric, switch between non-time-ordered and time-ordered graphs, search for a specific phrase (regular expressions are also supported), interact with the graphs themselves (e.g. zoom in/out), and download them (as PNG for now). For performance reasons, blocks corresponding to less than a specific percentage of samples will be collapsed ("(compressed)" will be shown instead, you can click it to expand it). This behaviour can be adjusted at the website, above the timeline view.
+
+## Acknowledgements
+The AdaptivePerfHTML development is possible thanks to the following funding sources:
+* The European Union HE research and innovation programme, grant agreement No 101092877 (SYCLOPS).
