@@ -1,3 +1,6 @@
+# AdaptivePerfHTML: Tool for producing HTML summary of profiling results
+# Copyright (C) CERN. See LICENSE for details.
+
 import subprocess
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 

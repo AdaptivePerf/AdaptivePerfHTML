@@ -1,3 +1,6 @@
+# AdaptivePerfHTML: Tool for producing HTML summary of profiling results
+# Copyright (C) CERN. See LICENSE for details.
+
 import pytest
 import json
 from pathlib import Path
