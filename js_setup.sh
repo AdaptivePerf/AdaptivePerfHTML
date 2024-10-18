@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# AdaptivePerfHTML: Tool for producing HTML summary of profiling results
+# Copyright (C) CERN. See LICENSE for details.
+
 set -e
 
 PROJ_DIR=$(pwd)
