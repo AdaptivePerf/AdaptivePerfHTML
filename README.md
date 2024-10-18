@@ -30,6 +30,13 @@ At the moment, AdaptivePerfHTML can be installed only on Unix-like systems such 
 ## How to use
 The web server can be started by running ```adaptiveperfhtml <path to results>```, where ```<path to results>``` is the path to a results directory created e.g. by AdaptivePerf. For configuration options, see ```adaptiveperfhtml --help```.
 
+When ```adaptiveperfhtml``` is run, look out for an output line similar to this:
+```
+[2024-10-12 13:57:52 +0200] [2192] [INFO] Listening at: http://127.0.0.1:8000 (2192)
+```
+
+The address points to the website where you can browse your profiling results.
+
 Under the hood, Gunicorn and [Flask](https://flask.palletsprojects.com) are used (set up automatically when installing AdaptivePerfHTML).
 
 If you prefer not to use ```adaptiveperfhtml``` or you cannot use it, set the ```FLASK_PROFILING_STORAGE``` environment variable to the path to a results directory and start the ```adaptiveperf.app:app``` Flask app using a method of your choice.
