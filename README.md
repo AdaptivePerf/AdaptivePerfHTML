@@ -32,6 +32,13 @@ The web server can be started by running ```adaptiveperfhtml <path to results>``
 
 Under the hood, Gunicorn and [Flask](https://flask.palletsprojects.com) are used (set up automatically when installing AdaptivePerfHTML).
 
+If you prefer not to use ```adaptiveperfhtml``` or you cannot use it, set the ```FLASK_PROFILING_STORAGE``` environment variable to the path to a results directory and start the ```adaptiveperf.app:app``` Flask app using a method of your choice.
+
+### Off-CPU timeline sampling
+If you have a profiling session with a huge number of off-CPU regions, rendering the timeline may become resource- and time-consuming for a web browser. In this case, you may want to enable off-CPU timeline sampling which samples captured off-CPU regions in a similar way AdaptivePerf samples off-CPU activity during profiling. This can be done by running ```adaptiveperfhtml -o <sampling period in ms> <path to results>``` or setting the ```FLASK_OFFCPU_SAMPLING``` environment variable to your sampling period in ms in case you don't use ```adaptiveperfhtml```.
+
+This mechanism is **disabled** by default, meaning that all captured off-CPU regions are shown. The setting can be changed only on the server side, but moving it to the client side is planned to be done soon.
+
 ### Using results from other programs than AdaptivePerf
 While AdaptivePerfHTML is designed with AdaptivePerf in mind, it can be used with any other profiler which produces result files in the AdaptivePerf format.
 
