@@ -4,6 +4,7 @@
 import re
 import sys
 import json
+import csv
 from treelib import Tree
 from pathlib import Path
 from collections import deque
@@ -62,22 +63,34 @@ class Identifier:
 
         self._executor = match.group(1)
         self._name = match.group(2)
+        self._label = None
 
     def __str__(self):
         """
         Return a user-friendly string representation of the identifier in
-        form of "[<executor>] <profiled filename> (<year>-<month>-<day> <hour>:
-        <minute>:<second>)" (or without ":<second>" if the seconds part
-        of the time was not provided during the object construction).
+        form of "<label>: [<executor>] <profiled filename>
+        (<year>-<month>-<day> <hour>:<minute>:<second>)" (or without
+        ":<second>" if the seconds part of the time was not provided during
+        the object construction).
         """
         if self._second is None:
-            return f'[{self._executor}] {self._name} ' \
+            return f'{self._label}: [{self._executor}] {self._name} ' \
                 f'({self._year}-{self._month}-{self._day} ' \
                 f'{self._hour}:{self._minute})'
         else:
-            return f'[{self._executor}] {self._name} ' \
+            return f'{self._label}: [{self._executor}] {self._name} ' \
                 f'({self._year}-{self._month}-{self._day} ' \
                 f'{self._hour}:{self._minute}:{self._second})'
+
+    def set_label_if_none(self, label):
+        if self._label is None:
+            self._label = label
+
+        return self
+
+    @property
+    def label(self):
+        return self._label
 
     @property
     def year(self):
@@ -159,10 +172,14 @@ class ProfilingResults:
                                  0 if identifier.second is None
                                  else -identifier.second,
                                  identifier.executor,
-                                 identifier.name)))
+                                 identifier.name,
+                                 '' if identifier.label is None
+                                 else identifier.label)))
 
-        return list(map(lambda x: Identifier(x[0]),
-                        sorted(id_str_list, key=lambda x: x[1])))
+        return list(
+            map(lambda x:
+                Identifier(x[1][0]).set_label_if_none(str(x[0])),
+                enumerate(sorted(id_str_list, key=lambda x: x[1]))))
 
     def __init__(self, profiling_storage: str, identifier: str):
         """
@@ -186,13 +203,125 @@ class ProfilingResults:
         if not metrics_path.exists():
             metrics_path = self._path / 'out' / 'event_dict.data'
 
-        self._metrics = {}
+        self._metrics = {
+            'walltime': {
+                'title': 'Wall time (ns)',
+                'flame_graph': True
+            }
+        }
 
         if metrics_path.exists():
             with metrics_path.open(mode='r') as f:
                 for line in f:
                     match = re.search(r'^(\S+) (.+)$',  line.strip())
-                    self._metrics[match.group(1)] = match.group(2)
+                    self._metrics[match.group(1)] = {
+                        'title': match.group(2),
+                        'flame_graph': True
+                    }
+
+        self._general_metrics = {}
+
+        if (self._path / 'processed' / 'roofline.csv').exists():
+            self._general_metrics['roofline'] = {
+                'title': 'Cache-aware roofline model'
+            }
+
+    def get_general_analysis(self, analysis_type):
+        """
+        Get general analysis data of a specified type. If the type
+        does not exist, None is returned.
+
+        :param str analysis_type: The type of a general analysis which
+                                  data should be returned for, e.g.
+                                  "roofline" for a cache-aware roofline
+                                  model.
+        """
+        if analysis_type == 'roofline':
+            p = self._path / 'processed' / 'roofline.csv'
+
+            if not p.exists():
+                return None
+
+            data = {
+                'type': analysis_type,
+                'l1': None,
+                'l2': None,
+                'l3': None,
+                'models': []
+            }
+
+            with p.open(mode='r', newline='') as f:
+                reader = csv.reader(f)
+
+                first_header = next(reader)
+
+                if len(first_header) != 21 or \
+                   [first_header[0], first_header[2],
+                    first_header[4], first_header[6]] + \
+                    first_header[9:] != \
+                    ['Name:', 'L1 Size:', 'L2 Size:',
+                     'L3 Size:', 'L1', 'L1', 'L2', 'L2',
+                     'L3', 'L3', 'DRAM', 'DRAM',
+                     'FP', 'FP', 'FP FMA', 'FP_FMA']:
+                    return None
+
+                second_header = next(reader)
+
+                if second_header != \
+                    ['Date', 'ISA', 'Precision', 'Threads',
+                     'Loads', 'Stores', 'Interleaved', 'DRAM Bytes',
+                     'FP Inst.', 'GB/s', 'I/Cycle', 'GB/s',
+                     'I/Cycle', 'GB/s', 'I/Cycle', 'GB/s',
+                     'I/Cycle', 'Gflop/s', 'I/Cycle', 'Gflop/s',
+                     'I/Cycle']:
+                    return None
+
+                data['l1'] = int(first_header[3])
+                data['l2'] = int(first_header[5])
+                data['l3'] = int(first_header[7])
+
+                for row in reader:
+                    if row is None or len(row) != 21:
+                        continue
+
+                    data['models'].append({
+                        'isa': row[1],
+                        'precision': row[2],
+                        'threads': row[3],
+                        'loads': row[4],
+                        'stores': row[5],
+                        'interleaved': row[6],
+                        'dram_bytes': row[7],
+                        'fp_inst': row[8],
+                        'l1': {
+                            'gbps': row[9],
+                            'instpc': row[10]
+                        },
+                        'l2': {
+                            'gbps': row[11],
+                            'instpc': row[12]
+                        },
+                        'l3': {
+                            'gbps': row[13],
+                            'instpc': row[14]
+                        },
+                        'dram': {
+                            'gbps': row[15],
+                            'instpc': row[16]
+                        },
+                        'fp': {
+                            'gflops': row[17],
+                            'instpc': row[18]
+                        },
+                        'fp_fma': {
+                            'gflops': row[19],
+                            'instpc': row[20]
+                        }
+                    })
+
+            return data
+        else:
+            return None
 
     def get_flame_graph(self, pid, tid, compress_threshold):
         """
@@ -419,18 +548,25 @@ class ProfilingResults:
           start time of an off-CPU interval and b is the length of such
           interval.
         * "start_callchain": the callchain spawning the thread/process.
-        * "metrics": the JSON object mapping extra profiling metrics (in
-          addition to on-CPU/off-CPU activity) to their website titles (e.g.
-          "page-faults" -> "Page faults"). It can be empty.
+        * "metrics": the JSON object mapping extra per-thread profiling metrics
+          (in addition to on-CPU/off-CPU activity) to their website titles
+          and their type (i.e. flame-graph-related or not flame-graph-related).
+          An example object is {"page-faults": {"title": "Page faults",
+          "flame_graph": true}}. The structure can also be empty.
+        * "general_metrics": the JSON object mapping general profiling
+          metrics to their website titles and other auxiliary data (e.g.
+          {"roofline": {"title": "Roofline model", ...}). This is set
+          only for the root and it can be empty.
         * "children": the list of all threads/processes spawned by the
-          thread/process. Each element has the same structure as the root.
+          thread/process. Each element has the same structure as the root
+          except for "general_metrics" which is absent.
         """
         def to_ms(num):
             return None if num is None else num / 1000000
 
         tree = self.get_thread_tree()
 
-        def node_to_dict(node):
+        def node_to_dict(node, is_root):
             process_name, pid_tid, start_time, runtime = node.tag
             pid_tid_code = pid_tid.replace('/', '_')
 
@@ -464,18 +600,23 @@ class ProfilingResults:
                 'children': []
             }
 
+            if is_root:
+                to_return['general_metrics'] = self._general_metrics
+
             children = tree.children(node.identifier)
 
             if len(children) > 0:
                 for child in children:
-                    to_return['children'].append(node_to_dict(child))
+                    to_return['children'].append(node_to_dict(child,
+                                                              False))
 
             return to_return
 
         if tree.root is None:
             return json.dumps({})
         else:
-            return json.dumps(node_to_dict(tree.get_node(tree.root)))
+            return json.dumps(node_to_dict(tree.get_node(tree.root),
+                                           True))
 
     def get_perf_maps(self):
         """

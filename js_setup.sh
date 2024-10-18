@@ -32,8 +32,8 @@ if [[ ! -d $PROJ_DIR/d3-flame-graph ]]; then
     echo "====="
     echo "$PROJ_DIR/d3-flame-graph does not exist!"
     echo ""
-    echo "Run \"git submodule update --init\", followed by running this script"
-    echo "from the root folder of the AdaptivePerfHTML repository."
+    echo "Run \"git submodule update --init --force\", followed by running this"
+    echo "script from the root folder of the AdaptivePerfHTML repository."
     echo "====="
     exit 1
 fi
@@ -45,7 +45,9 @@ mkdir $TMP_DIR
 cd $TMP_DIR
 npm init --yes
 npm install --install-links $PROJ_DIR/d3-flame-graph
+npm install function-plot
 cp node_modules/*/dist/*.min.js node_modules/*/dist/*.css $PROJ_DIR/src/adaptiveperf/static
+cp node_modules/function-plot/dist/function-plot.js $PROJ_DIR/src/adaptiveperf/static
 npm install vis-timeline@7.7.3
 cp node_modules/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js node_modules/vis-timeline/styles/vis-timeline-graph2d.min.css $PROJ_DIR/src/adaptiveperf/static
 

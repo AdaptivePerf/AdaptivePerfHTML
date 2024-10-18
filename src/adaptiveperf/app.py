@@ -38,6 +38,10 @@ def post(identifier):
     * "perf_map" (with any value):
       This instructs AdaptivePerfHTML to return perf symbol maps
       obtained in the session.
+    * "general_analysis" (with a string value):
+      This instructs AdaptivePerfHTML to return general analysis data
+      of a type specified in the value (e.g. "roofline" for a cache-aware
+      roofline model).
     * "pid" (with a numeric value) and "tid" (with a numeric value)
       and "threshold" (with a decimal value):
       This instructs AdaptivePerfHTML to return a flame graph of
@@ -59,6 +63,7 @@ def post(identifier):
         Identifier(identifier)
 
         if 'tree' in request.values or 'perf_map' in request.values or \
+           'general_analysis' in request.values or \
            ('pid' in request.values and 'tid' in request.values and
             'threshold' in request.values) or \
            'callchain' in request.values:
@@ -69,6 +74,14 @@ def post(identifier):
                 return results.get_json_tree()
             elif 'perf_map' in request.values:
                 return results.get_perf_maps()
+            elif 'general_analysis' in request.values:
+                json_data = results.get_general_analysis(
+                    request.values['general_analysis'])
+
+                if json_data is None:
+                    return '', 404
+                else:
+                    return json_data
             elif 'pid' in request.values and 'tid' in request.values and \
                  'threshold' in request.values:
                 json_data = results.get_flame_graph(
@@ -101,7 +114,7 @@ def main():
         ids=ProfilingResults.get_all_ids(
             app.config['PROFILING_STORAGE']),
         offcpu_sampling=app.config.get(
-            'OFFCPU_SAMPLING', 500),
+            'OFFCPU_SAMPLING', 0),
         scripts=scripts,
         stylesheets=stylesheets,
         d3_flamegraph_css=d3_flamegraph_css.replace('\n', ' '))
