@@ -339,10 +339,11 @@ $(document).on('change', '#results_combobox', function() {
                 for (var i = 0; i < json.off_cpu.length; i++) {
                     var start = json.off_cpu[i][0];
                     var end = start + json.off_cpu[i][1];
-                    var offcpu_sampling =
-                        $('#viewer_script').attr('data-offcpu-sampling');
+                    var offcpu_sampling = parseInt(
+                        $('#viewer_script').attr('data-offcpu-sampling'));
 
-                    if (start % offcpu_sampling === 0 ||
+                    if (offcpu_sampling === 0 ||
+                        start % offcpu_sampling === 0 ||
                         end % offcpu_sampling === 0 ||
                         Math.floor(start / offcpu_sampling) != Math.floor(
                             end / offcpu_sampling)) {

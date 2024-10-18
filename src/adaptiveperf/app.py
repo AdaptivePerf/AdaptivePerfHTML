@@ -114,7 +114,7 @@ def main():
         ids=ProfilingResults.get_all_ids(
             app.config['PROFILING_STORAGE']),
         offcpu_sampling=app.config.get(
-            'OFFCPU_SAMPLING', 500),
+            'OFFCPU_SAMPLING', 0),
         scripts=scripts,
         stylesheets=stylesheets,
         d3_flamegraph_css=d3_flamegraph_css.replace('\n', ' '))
