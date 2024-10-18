@@ -24,10 +24,13 @@ This is a Python package, so you can install it with ```pip```:
 pip install git+https://github.com/AdaptivePerf/AdaptivePerfHTML
 ```
 
-## How to use
-AdaptivePerfHTML can be used as a [Flask](https://flask.palletsprojects.com) app for hosting a website displaying the results of all profiling sessions run so far in a given environment.
+#### Windows
+At the moment, AdaptivePerfHTML can be installed only on Unix-like systems such as Linux and macOS. Because these should also include [WSL (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/install), you should still be able to use the tool on Windows, with extra steps needed to set up WSL.
 
-Firstly, set the ```FLASK_PROFILING_STORAGE``` environment variable to the path to the ```results``` directory created by AdaptivePerf. Then, start Flask and point it to ```adaptiveperf.app:app```.
+## How to use
+The web server can be started by running ```adaptiveperfhtml <path to results>```, where ```<path to results>``` is the path to a results directory created e.g. by AdaptivePerf. For configuration options, see ```adaptiveperfhtml --help```.
+
+Under the hood, Gunicorn and [Flask](https://flask.palletsprojects.com) are used (set up automatically when installing AdaptivePerfHTML).
 
 ### Using results from other programs than AdaptivePerf
 While AdaptivePerfHTML is designed with AdaptivePerf in mind, it can be used with any other profiler which produces result files in the AdaptivePerf format.
@@ -37,12 +40,13 @@ You can check the source code of AdaptivePerf for learning how it formats its pr
 ## Website layout
 After opening the website, follow this getting started guide:
 1. Select your profiling session from the "Please select a profiling session" combobox and wait until the timeline loads.
-2. In the timeline, you can browse the thread/process tree (including expanding and collapsing threads/processes) on the left and see how long the thread/process ran for on the right in form of timeline blocks. The time axis is in milliseconds.
+2. In the timeline, you can browse the thread/process tree (including expanding and collapsing threads/processes) on the left and see how long the thread/process ran for on the right in form of timeline blocks.
 3. Each thread/process has a corresponding name, PID, and TID.
-4. Each block has red and blue parts. Red parts correspond to on-CPU activity while blue parts correspond to off-CPU activity. Not every off-CPU activity may be shown on the timeline for rendering performance reasons (and also depending on the sampling rate chosen when running AdaptivePerf).
-5. Right-click a thread/process block to check the exact runtime of the thread/process (as measured between the relevant start and exit syscalls), the ```perf```-sampled runtime, and the stack trace of a function which spawned the thread/process. If the difference between the sampled and exact runtime is significant (the threshold can be adjusted by the user at the website, above the timeline view), the sampled runtime will be shown in red.
-6. Double-click a thread/process block to open the browser of thread/process-specific profiling results. There, you can select the analysis type you want to see (only flame graphs at the moment).
-7. For flame graphs, you can change the profiling metric, switch between non-time-ordered and time-ordered graphs, search for a specific phrase (regular expressions are also supported), interact with the graphs themselves (e.g. zoom in/out), and download them (as PNG for now). For performance reasons, blocks corresponding to less than a specific percentage of samples will be collapsed ("(compressed)" will be shown instead, you can click it to expand it). This behaviour can be adjusted at the website, above the timeline view.
+4. Each block has red and blue parts. Red parts correspond to on-CPU activity while blue parts correspond to off-CPU activity. Not every off-CPU activity may have been captured depending on the off-CPU sampling frequency chosen when profiling.
+5. Right-click a thread/process block to check the exact runtime of the thread/process, the ```perf```-sampled runtime, available analysis results (e.g. flame graphs), and the stack trace of a function which spawned the thread/process if available. If the difference between the sampled and exact runtime is significant (the threshold can be adjusted by the user in the settings above the timeline view), the sampled runtime will be shown in red.
+6. Click an analysis result of your choice in a thread/process context menu to open it in a new internal window. You can open as many windows as you wish and every window can be freely moved, resized, and collapsed (by clicking the eye icon in a title bar). All windows persist across profiling sessions (so you can e.g. open two windows side-by-side from two different sessions).
+7. For flame graphs, you can change the profiling metric, switch between non-time-ordered and time-ordered graphs, search for a specific phrase (regular expressions are also supported), interact with the graphs themselves (e.g. zoom in/out), and download them (as PNG for now). For performance reasons, blocks corresponding to less than a specific percentage of samples will be collapsed ("(compressed)" will be shown instead, you can click it to expand it). This behaviour can be adjusted in the settings above the timeline view.
+8. You can open general analysis results (e.g. roofline plots) by clicking the "General analyses" icon next to the settings icon above the timeline view.
 
 ## Acknowledgements
 The AdaptivePerfHTML development is possible thanks to the following funding sources:
