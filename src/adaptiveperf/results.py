@@ -641,6 +641,7 @@ class ProfilingResults:
                         print(f'Line {i}, {map_path}: '
                               'incorrect syntax, ignoring.',
                               file=sys.stderr)
+                        continue
 
                     data.append(('0x' + match.group(1),
                                  hex(int(match.group(1), 16) +
