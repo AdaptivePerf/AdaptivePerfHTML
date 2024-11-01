@@ -387,6 +387,7 @@ $(document).on('change', '#results_combobox', function() {
                     session_dict[value].perf_maps_obj = ajax_obj;
                     part3(true);
                 }).fail(ajax_obj => {
+                    session_dict[value].perf_maps_obj = {};
                     alert('Could not obtain the perf symbol maps! You ' +
                           'will not get meaningful names when checking ' +
                           'stack traces e.g. for JIT-ed codes.');
