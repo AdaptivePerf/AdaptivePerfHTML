@@ -152,6 +152,13 @@ function createWindowDOM(type, timeline_group_id) {
 </div>
 `,
         code: `
+<div>
+  <pre>
+    <code class="code_box">
+
+    </code>
+  </pre>
+</div>
 `
     };
 
@@ -819,7 +826,11 @@ function setupWindow(window_obj, type, data) {
             });
         }
     } else if (type === 'code') {
-
+        window_obj.find('.window_title').html(
+            '[Session: ' + session.label + '] ' +
+                'Code preview');
+        window_obj.find('.code_box').text(data.code);
+        loading_jquery.hide();
     }
 }
 
@@ -834,9 +845,15 @@ function setupWindow(window_obj, type, data) {
 // when a code preview window is shown.
 function openCode(data, default_path) {
     var session = session_dict[$('#results_combobox').val()];
+    var load = function(code) {
+        var window = createWindowDOM('code');
+        setupWindow(window, 'code', {
+            code: code
+        });
+    };
 
     if (default_path in session.src_cache) {
-        window.alert(session.src_cache[default_path]);
+        load(session.src_cache[default_path]);
     } else {
         $.ajax({
             url: $('#block').attr('result_id') + '/',
@@ -845,7 +862,7 @@ function openCode(data, default_path) {
             data: {src: session.src_index_dict[default_path]}
         }).done(src_code => {
             session.src_cache[default_path] = src_code;
-            window.alert(src_code);
+            load(src_code);
         }).fail(ajax_obj => {
 
         });
