@@ -2,10 +2,9 @@
 // Copyright (C) CERN. See LICENSE for details.
 
 // Window templates start here
-function createWindowDOM(analysis_type) {
-    const roofline_window = `
-<div class="window roofline_window">
-  <div class="window_header">
+function createWindowDOM(type) {
+    const window_header = `
+<div class="window_header">
     <span class="window_title"></span>
     <span class="window_close" onmousedown="windowStopPropagation(event)">
       <!-- This SVG is from Google Material Icons, originally licensed under
@@ -28,126 +27,108 @@ function createWindowDOM(analysis_type) {
       </svg>
     </span>
   </div>
-  <div class="roofline_content window_content">
-    <div class="roofline_box">
-      <div class="roofline_settings">
-        <fieldset class="roofline_type">
-          <legend>Type</legend>
-          <select name="roofline_type" class="roofline_type_select">
-            <option value="" selected="selected" disabled="disabled">
-              Select...
-            </option>
-          </select>
-        </fieldset>
-        <fieldset class="roofline_bounds">
-          <legend>Bounds</legend>
-          <div class="roofline_l1">
-            <b>L1:</b> on
-          </div>
-          <div class="roofline_l2">
-            <b>L2:</b> on
-          </div>
-          <div class="roofline_l3">
-            <b>L3:</b> on
-          </div>
-          <div class="roofline_dram">
-            <b>DRAM:</b> on
-          </div>
-          <div class="roofline_fp" title="There are two performance ceilings: FP_FMA (floating-point ops with FMA instructions) and FP (floating-point ops without FMA instructions). FP_FMA is used for plotting L1/L2/L3/DRAM bounds, but the lower FP ceiling can be plotted as an extra dashed black line since not all programs use FMA.">
-            <b>FP:</b> on
-          </div>
-        </fieldset>
-        <fieldset class="roofline_details">
-          <legend>Details</legend>
-          <span class="roofline_details_text">
-            <i>Please select a roofline type first.</i>
-          </span>
-        </fieldset>
-      </div>
-      <div class="roofline">
-
-      </div>
-    </div>
-  </div>
-</div>
 `;
 
-    const flame_graph_window = `
-<div class="window flamegraph_window">
-  <div class="window_header">
-    <span class="window_title">Flame graphs</span>
-    <span class="window_close" onmousedown="windowStopPropagation(event)">
-      <!-- This SVG is from Google Material Icons, originally licensed under
-           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-           (covered by GNU GPL v3 here) -->
-      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
-           viewBox="0 -960 960 960" width="24px">
-        <title>Close</title>
-        <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
-      </svg>
-    </span>
-   <span class="window_visibility" onmousedown="windowStopPropagation(event)">
-      <!-- This SVG is from Google Material Icons, originally licensed under
-           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-           (covered by GNU GPL v3 here) -->
-      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
-           viewBox="0 -960 960 960" width="24px">
-        <title>Toggle visibility</title>
-        <path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/>
-      </svg>
-    </span>
+    const type_dict = {
+        roofline: `
+<div class="roofline_box">
+  <div class="roofline_settings">
+    <fieldset class="roofline_type">
+      <legend>Type</legend>
+      <select name="roofline_type" class="roofline_type_select">
+        <option value="" selected="selected" disabled="disabled">
+          Select...
+        </option>
+      </select>
+    </fieldset>
+    <fieldset class="roofline_bounds">
+      <legend>Bounds</legend>
+      <div class="roofline_l1">
+        <b>L1:</b> on
+      </div>
+      <div class="roofline_l2">
+        <b>L2:</b> on
+      </div>
+      <div class="roofline_l3">
+        <b>L3:</b> on
+      </div>
+      <div class="roofline_dram">
+        <b>DRAM:</b> on
+      </div>
+      <div class="roofline_fp" title="There are two performance ceilings: FP_FMA (floating-point ops with FMA instructions) and FP (floating-point ops without FMA instructions). FP_FMA is used for plotting L1/L2/L3/DRAM bounds, but the lower FP ceiling can be plotted as an extra dashed black line since not all programs use FMA.">
+        <b>FP:</b> on
+      </div>
+    </fieldset>
+    <fieldset class="roofline_details">
+      <legend>Details</legend>
+      <span class="roofline_details_text">
+        <i>Please select a roofline type first.</i>
+      </span>
+    </fieldset>
   </div>
-  <div class="flamegraph_box window_content">
-    <span class="collapse_info">
-      Some blocks may be collapsed to speed up rendering, but you can expand
-      them by clicking them.
-    </span>
-    <div class="flamegraph_choice">
-      <div class="flamegraph_metric_choice">
-        Metric:
-        <select name="metric" class="flamegraph_metric">
+  <div class="roofline">
 
-        </select>
-        <input type="checkbox" class="flamegraph_time_ordered" />
-        <label class="flamegraph_time_ordered_label">Time-ordered</label>
-      </div>
-      <div class="flamegraph_remainder">
-        <input type="text" class="flamegraph_search"
-               placeholder="Search..." />
-        <!-- This SVG is from Google Material Icons, originally licensed under
-             Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-             (covered by GNU GPL v3 here) -->
-        <svg class="pointer flamegraph_download" xmlns="http://www.w3.org/2000/svg" height="24px"
-             viewBox="0 -960 960 960" width="24px" fill="#000000">
-          <title>Download the current flame graph view as PNG</title>
-          <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
-        </svg>
-      </div>
-    </div>
-    <div class="flamegraph_search_results">
-      <b>Search results:</b> <span class="flamegraph_search_blocks"></span> block(s) accounting for
-      <span class="flamegraph_search_found"></span> unit(s) out of
-      <span class="flamegraph_search_total"></span> (<span class="flamegraph_search_percentage"></span>%)
-    </div>
-    <div class="flamegraph scrollable">
-      <p class="no_flamegraph">
-        There is no flame graph associated with the selected process/thread,
-        metric, and time order (or the flame graph could not be loaded)!
-        This may be caused by the inability of capturing a specific event
-        for that process/thread (it is a disadvantage of sampling-based
-        profiling).
-      </p>
-      <div class="flamegraph_svg"></div>
-    </div>
   </div>
 </div>
-`;
+`,
+        flame_graphs: `
+<span class="collapse_info">
+  Some blocks may be collapsed to speed up rendering, but you can expand
+  them by clicking them.
+</span>
+<div class="flamegraph_choice">
+  <div class="flamegraph_metric_choice">
+    Metric:
+    <select name="metric" class="flamegraph_metric">
 
-    if (analysis_type === 'flame_graphs') {
-        return $(flame_graph_window);
-    } else if (analysis_type === 'roofline') {
-        return $(roofline_window);
-    }
+    </select>
+    <input type="checkbox" class="flamegraph_time_ordered" />
+    <label class="flamegraph_time_ordered_label">Time-ordered</label>
+  </div>
+  <div class="flamegraph_remainder">
+    <input type="text" class="flamegraph_search"
+           placeholder="Search..." />
+    <!-- This SVG is from Google Material Icons, originally licensed under
+         Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+         (covered by GNU GPL v3 here) -->
+    <svg class="pointer flamegraph_download" xmlns="http://www.w3.org/2000/svg" height="24px"
+         viewBox="0 -960 960 960" width="24px" fill="#000000">
+      <title>Download the current flame graph view as PNG</title>
+      <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
+    </svg>
+  </div>
+</div>
+<div class="flamegraph_search_results">
+  <b>Search results:</b> <span class="flamegraph_search_blocks"></span> block(s) accounting for
+  <span class="flamegraph_search_found"></span> unit(s) out of
+  <span class="flamegraph_search_total"></span> (<span class="flamegraph_search_percentage"></span>%)
+</div>
+<div class="flamegraph scrollable">
+  <p class="no_flamegraph">
+    There is no flame graph associated with the selected process/thread,
+    metric, and time order (or the flame graph could not be loaded)!
+    This may be caused by the inability of capturing a specific event
+    for that process/thread (it is a disadvantage of sampling-based
+    profiling).
+  </p>
+  <div class="flamegraph_svg"></div>
+</div>
+`,
+        code: `
+`
+    };
+
+    var root = $('<div></div>');
+    root.attr('class', 'window ' + type + '_window');
+    root.append($(window_header));
+
+    var content = $('<div></div>');
+    content.attr('class', 'window_content ' + type + '_content');
+    content.html(type_dict[type]);
+
+    root.append(content);
+
+    return root;
 }
 // Window templates end here
 

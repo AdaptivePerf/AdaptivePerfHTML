@@ -150,11 +150,10 @@
           background-color:#DDDDDD;
       }
 
-      .flamegraph_box {
+      .flame_graphs_content {
           overflow:hidden;
           display:flex;
           flex-direction:column;
-          flex-grow:1;
       }
 
       .flamegraph_choice {
@@ -225,7 +224,7 @@
           margin-right:10px;
       }
 
-      .flamegraph_window {
+      .flame_graphs_window {
           min-width:750px;
           width:750px;
           min-height:200px;
@@ -346,7 +345,6 @@
       }
 
       .roofline_content {
-          flex-grow:1;
           display:flex;
           flex-direction:column;
       }
@@ -413,6 +411,17 @@
           padding:2px;
           margin-bottom:5px;
           cursor:pointer;
+      }
+
+      .code_window {
+          min-width:750px;
+          width:750px;
+          min-height:550px;
+          height:550px;
+      }
+
+      .code_content {
+
       }
     </style>
   </head>
@@ -502,7 +511,7 @@
 
       </div>
       <div id="callchain_item">
-        Spawned by:
+        Spawned by (hover/click to see code details):
         <div id="callchain"></div>
       </div>
     </div>
