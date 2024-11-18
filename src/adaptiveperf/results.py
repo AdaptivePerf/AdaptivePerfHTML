@@ -667,13 +667,14 @@ class ProfilingResults:
         if self._source_zip_path is None:
             return None
 
-        zip = ZipFile(self._source_zip_path)
+        with ZipFile(self._source_zip_path) as zip:
+            path = ZipFilePath(zip, filename)
 
-        if not ZipFilePath(zip, filename).exists():
-            return None
+            if not path.exists():
+                return None
 
-        with zip.open(filename) as f:
-            return f.read()
+            with path.open() as f:
+                return f.read()
 
     def get_perf_maps(self):
         """
