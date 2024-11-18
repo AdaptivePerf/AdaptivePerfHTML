@@ -5,6 +5,8 @@ import re
 import sys
 import json
 import csv
+from zipfile import ZipFile
+from zipfile import Path as ZipFilePath
 from treelib import Tree
 from pathlib import Path
 from collections import deque
@@ -225,6 +227,25 @@ class ProfilingResults:
             self._general_metrics['roofline'] = {
                 'title': 'Cache-aware roofline model'
             }
+
+        self._sources = {}
+        self._source_index = {}
+        self._source_zip_path = None
+
+        source_json_files = (self._path / 'processed').glob('*_sources.json')
+
+        for p in source_json_files:
+            name = re.search(r'(.+)_sources\.json', p.name).group(1)
+            with p.open(mode='r') as f:
+                self._sources[name] = json.load(f)
+
+        if (self._path / 'processed' / 'src_index.json').exists() and \
+           (self._path / 'processed' / 'src.zip').exists():
+            with (self._path / 'processed' / 'src_index.json').open(
+                    mode='r') as f:
+                self._source_index = json.load(f)
+
+            self._source_zip_path = self._path / 'processed' / 'src.zip'
 
     def get_general_analysis(self, analysis_type):
         """
@@ -493,11 +514,12 @@ class ProfilingResults:
     def get_callchain_mappings(self):
         """
         Get a JSON object string representing dictionaries mapping compressed
-        callchain symbol names to full symbol names.
+        callchain names to full symbol and library/executable names.
 
         Inside the object, the dictionaries are grouped by event types, e.g.
-        "syscalls" has the mappings between compressed callchain symbol names
-        captured during tree profiling and full symbol names.
+        "syscalls" has the mappings between compressed callchain names
+        captured during tree profiling and full symbol and
+        library/executable names.
         """
         paths = (self._path / 'processed').glob('*_callchains.json')
         result_dict = {}
@@ -557,6 +579,19 @@ class ProfilingResults:
           metrics to their website titles and other auxiliary data (e.g.
           {"roofline": {"title": "Roofline model", ...}). This is set
           only for the root and it can be empty.
+        * "src": the JSON object mapping library/executable offsets to
+          lines within source code files. This is set only for the root
+          and it can be empty. The structure is as follows:
+          {"<event type>": {"<library/executable path>":
+          {"<hex offset>": {"file": "<path>", "line": <number>}}}}.
+          <event type> can be one of: "syscall" (for thread/process tree
+          tracing), "walltime" (for on-CPU/off-CPU profiling), or the name
+          of a custom event specified by the user. Refer to "src_index"
+          (which is also returned by get_json_tree()) and use get_source_code()
+          to obtain a source code corresponding to <path>.
+        * "src_index": the JSON object mapping source code paths inside
+          "src" to shortened filenames that should be provided to
+          get_source_code(). This is set only for the root and it can be empty.
         * "children": the list of all threads/processes spawned by the
           thread/process. Each element has the same structure as the root
           except for "general_metrics" which is absent.
@@ -602,6 +637,8 @@ class ProfilingResults:
 
             if is_root:
                 to_return['general_metrics'] = self._general_metrics
+                to_return['src'] = self._sources
+                to_return['src_index'] = self._source_index
 
             children = tree.children(node.identifier)
 
@@ -617,6 +654,26 @@ class ProfilingResults:
         else:
             return json.dumps(node_to_dict(tree.get_node(tree.root),
                                            True))
+
+    def get_source_code(self, filename):
+        """
+        Get a source code stored in the session under a specified
+        name.
+
+        :param str filename: The name of a source code to be
+                             obtained. It must come from "src_index"
+                             produced by get_thread_tree().
+        """
+        if self._source_zip_path is None:
+            return None
+
+        zip = ZipFile(self._source_zip_path)
+
+        if not ZipFilePath(zip, filename).exists():
+            return None
+
+        with zip.open(filename) as f:
+            return f.read()
 
     def get_perf_maps(self):
         """

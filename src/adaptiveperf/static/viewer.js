@@ -191,16 +191,20 @@ var session_dict = {};
 var current_focused_window_id = undefined;
 var largest_z_index = 0;
 
-function getSymbolFromMap(elem) {
+function getSymbolFromMap(addr, map_name) {
     var session = session_dict[$('#results_combobox').val()];
-    if (elem in session.perf_maps_cache) {
-        return session.perf_maps_cache[elem];
+    if ([addr, map_name] in session.perf_maps_cache) {
+        return session.perf_maps_cache[[addr, map_name]];
     }
 
-    var regex = /^\((0x[0-9a-f]+);(.+)\)$/;
-    var match = regex.exec(elem);
+    var regex = /^\[(0x[0-9a-f]+)\]$/;
+    var match = regex.exec(addr);
+
+    if (match == null) {
+        return addr;
+    }
+
     var addr = parseInt(match[1], 16);
-    var map_name = match[2];
 
     if (map_name in session.perf_maps_obj) {
         var data = session.perf_maps_obj[map_name];
@@ -213,7 +217,7 @@ function getSymbolFromMap(elem) {
             var addr2 = parseInt(data[middle][1], 16);
 
             if (addr >= addr1 && addr <= addr2) {
-                session.perf_maps_cache[elem] = data[middle][2];
+                session.perf_maps_cache[[addr, map_name]] = data[middle][2];
                 return data[middle][2];
             } else if (addr < addr1) {
                 end = middle - 1;
@@ -223,7 +227,7 @@ function getSymbolFromMap(elem) {
         }
     }
 
-    return elem;
+    return addr;
 }
 
 $(document).on('change', '#results_combobox', function() {
@@ -253,7 +257,8 @@ $(document).on('change', '#results_combobox', function() {
                                        callchain_dict, tooltip_dict,
                                        warning_dict, overall_end_time,
                                        general_metrics_dict,
-                                       sampled_diff_dict) {
+                                       sampled_diff_dict,
+                                       src_dict, src_index_dict) {
                 var item = {
                     id: json.id,
                     group: json.id,
@@ -332,6 +337,14 @@ $(document).on('change', '#results_combobox', function() {
                     Object.assign(general_metrics_dict, json.general_metrics);
                 }
 
+                if ('src' in json && $.isEmptyObject(src_dict)) {
+                    Object.assign(src_dict, json.src);
+                }
+
+                if ('src_index' in json && $.isEmptyObject(src_index_dict)) {
+                    Object.assign(src_index_dict, json.src_index);
+                }
+
                 if (level > 0) {
                     callchain_dict[item.id] = json.start_callchain;
                 }
@@ -373,7 +386,9 @@ $(document).on('change', '#results_combobox', function() {
                                       warning_dict,
                                       overall_end_time,
                                       general_metrics_dict,
-                                      sampled_diff_dict);
+                                      sampled_diff_dict,
+                                      src_dict,
+                                      src_index_dict);
                 }
             }
 
@@ -409,7 +424,10 @@ $(document).on('change', '#results_combobox', function() {
                     session_dict[value].perf_maps_cache = {};
                     session_dict[value].result_cache = {};
                     session_dict[value].sampled_diff_dict = {};
+                    session_dict[value].src_dict = {};
+                    session_dict[value].src_index_dict = {};
                     session_dict[value].overall_end_time = [0];
+                    session_dict[value].src_cache = {};
 
                     from_json_to_item(JSON.parse(result), 0,
                                       session_dict[value].item_list,
@@ -421,7 +439,9 @@ $(document).on('change', '#results_combobox', function() {
                                       session_dict[value].warning_dict,
                                       session_dict[value].overall_end_time,
                                       session_dict[value].general_metrics_dict,
-                                      session_dict[value].sampled_diff_dict);
+                                      session_dict[value].sampled_diff_dict,
+                                      session_dict[value].src_dict,
+                                      session_dict[value].src_index_dict);
                 }
 
                 var container = $('#block')[0];
@@ -467,25 +487,62 @@ $(document).on('change', '#results_combobox', function() {
                         var warning_dict = session_dict[value].warning_dict;
                         var general_metrics_dict = session_dict[value].general_metrics_dict;
                         var sampled_diff_dict = session_dict[value].sampled_diff_dict;
+                        var src_dict = session_dict[value].src_dict;
+                        var src_index_dict = session_dict[value].src_index_dict;
 
                         if (props.group in callchain_dict) {
-                            $('#callchain').text(callchain_dict[props.group].map(elem => {
+                            $('#callchain').html('');
+
+                            var first = true;
+                            for (const [name, offset] of callchain_dict[props.group]) {
+                                var new_span = $('<span></span>');
+                                new_span.css('cursor', 'help');
+
                                 if (callchain_obj !== undefined &&
-                                    elem in callchain_obj['syscall']) {
-                                    return callchain_obj['syscall'][elem];
-                                } else if (/^\(0x[0-9a-f]+;.+\)$/.test(elem)) {
-                                    return getSymbolFromMap(elem);
-                                } else if (/^\[.+\]$/.test(elem) ||
-                                           /^\(0x[0-9a-f]+\)$/.test(elem)) {
-                                    return elem;
+                                    name in callchain_obj['syscall']) {
+                                    var symbol = callchain_obj['syscall'][name];
+                                    new_span.text(getSymbolFromMap(symbol[0], symbol[1]));
+
+                                    if (symbol[1] in src_dict.syscall &&
+                                        offset in src_dict.syscall[symbol[1]]) {
+                                        var src = src_dict.syscall[symbol[1]][offset];
+                                        new_span.attr('title', src.file + ':' + src.line);
+
+                                        if (src.file in src_index_dict) {
+                                            new_span.css('color', 'green');
+                                            new_span.css('font-weight', 'bold');
+                                            new_span.css('text-decoration', 'underline');
+                                            new_span.css('cursor', 'pointer');
+
+                                            new_span.on(
+                                                'click', {file: src.file,
+                                                          filename: src_index_dict[src.file],
+                                                          line: src.line},
+                                                function(event) {
+                                                    var data = {};
+                                                    data[event.data.file] = {}
+                                                    data[event.data.file][
+                                                        event.data.line] = 'exact';
+                                                    openCode(data, event.data.file);
+                                            });
+                                        }
+                                    } else {
+                                        new_span.attr('title', symbol[1] + '+' + offset);
+                                    }
                                 } else {
-                                    return elem +
-                                        ' (not-yet-loaded or missing ' +
-                                        'callchain dictionary)';
+                                    new_span.text(name +
+                                                  ' (not-yet-loaded or missing ' +
+                                                  'callchain dictionary)');
                                 }
-                            }).join('\n'));
-                            $('#callchain').html(
-                                $('#callchain').html().replace(/\n/g, '<br />'));
+
+                                if (first) {
+                                    first = false;
+                                } else {
+                                    $('#callchain').append('<br />');
+                                }
+
+                                $('#callchain').append(new_span);
+                            }
                             $('#callchain_item').show();
                         } else {
                             $('#callchain_item').hide();
@@ -728,6 +785,37 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
                 onWindowCloseClick(window_obj.attr('id'));
             });
         }
+    } else if (analysis_type === 'code') {
+
+    }
+}
+
+// Data should have the following form:
+// {
+//     '<path>': {
+//         '<line number>': '<"exact" or "sampled">'
+//     }
+// }
+//
+// default_path corresponds to <path> to be displayed first
+// when a code preview window is shown.
+function openCode(data, default_path) {
+    var session = session_dict[$('#results_combobox').val()];
+
+    if (default_path in session.src_cache) {
+        window.alert(session.src_cache[default_path]);
+    } else {
+        $.ajax({
+            url: $('#block').attr('result_id') + '/',
+            method: 'POST',
+            dataType: 'text',
+            data: {src: session.src_index_dict[default_path]}
+        }).done(src_code => {
+            session.src_cache[default_path] = src_code;
+            window.alert(src_code);
+        }).fail(ajax_obj => {
+
+        });
     }
 }
 
@@ -1114,9 +1202,8 @@ function openFlameGraph(window_id, metric) {
     });
     flamegraph_obj.getName(function(node) {
         if (node.data.name in session.callchain_obj[window_obj.find('.flamegraph_metric').val()]) {
-            return session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
-        } else if (/^\(0x[0-9a-f]+;.+\)$/.test(node.data.name)) {
-            return getSymbolFromMap(node.data.name);
+            var symbol = session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
+            return getSymbolFromMap(symbol[0], symbol[1]);
         } else {
             return node.data.name;
         }
