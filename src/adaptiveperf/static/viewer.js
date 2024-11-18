@@ -1,8 +1,45 @@
 // AdaptivePerfHTML: Tool for producing HTML summary of profiling results
 // Copyright (C) CERN. See LICENSE for details.
 
-// Window templates start here
-function createWindowDOM(type) {
+// Window directory structure:
+// {
+//     '<div ID>': {
+//         'type': '<analysis type, e.g. flame_graphs>',
+//         'data': {
+//             <data relevant to analysis type>
+//         },
+//         'collapsed': <whether the window is collapsed>,
+//         'last_height': <last window height before becoming invisible, may be undefined>,
+//         'min_height': <window minimum height, may be undefined>
+//     }
+// }
+var window_dict = {};
+
+// (Profiling) session directory structure:
+// {
+//     '<session ID>': {
+//         'label': ...,
+//         'result_cache': ...,
+//         'callchain_obj': ...,
+//         'callchain_dict': ...,
+//         'perf_maps_obj': ...,
+//         'perf_maps_cache': ...,
+//         'sampled_diff_dict': ...,
+//         'item_list': ...,
+//         'group_list': ...,
+//         'item_dict': ...,
+//         'callchain_dict': ...,
+//         'metrics_dict': ...,
+//         'tooltip_dict': ...,
+//         'warning_dict': ...,
+//         'general_metrics_dict': ...,
+//         'overall_end_time': ...
+//     }
+// }
+var session_dict = {};
+
+// Window templates
+function createWindowDOM(type, timeline_group_id) {
     const window_header = `
 <div class="window_header">
     <span class="window_title"></span>
@@ -128,46 +165,53 @@ function createWindowDOM(type) {
 
     root.append(content);
 
+    var session_id = $('#results_combobox').prop('selectedIndex');
+    var index = 0;
+    var new_window_id = undefined;
+
+    if (timeline_group_id === undefined) {
+        new_window_id =
+            `w_${session_id}_${type}_${index}`;
+
+        while (new_window_id in window_dict) {
+            index++;
+            new_window_id =
+                `w_${session_id}_${type}_${index}`;
+        }
+    } else {
+        new_window_id =
+            `w_${session_id}_${type}_${timeline_group_id}_${index}`;
+
+        while (new_window_id in window_dict) {
+            index++;
+            new_window_id =
+                `w_${session_id}_${type}_${timeline_group_id}_${index}`;
+        }
+    }
+
+    window_dict[new_window_id] = {
+        'type': type,
+        'data': {},
+        'being_resized': false,
+        'collapsed': false
+    };
+
+    root.attr('id', new_window_id);
+    root.attr('onclick', 'changeFocus(\'' +
+              root.attr('id') + '\')');
+    root.attr('onmouseup', 'onWindowMouseUp(\'' +
+              root.attr('id') + '\')');
+    root.find('.window_header').attr('onmousedown', 'startDrag(event, \'' +
+                                     root.attr('id') + '\')');
+    root.find('.window_visibility').attr(
+        'onclick', 'onWindowVisibilityClick(event, \'' +
+            root.attr('id') + '\')');
+    root.find('.window_close').attr(
+        'onclick', 'onWindowCloseClick(\'' +
+            root.attr('id') + '\')');
+
     return root;
 }
-// Window templates end here
-
-// Window directory structure:
-// {
-//     '<div ID>': {
-//         'type': '<analysis type, e.g. flame_graphs>',
-//         'data': {
-//             <data relevant to analysis type>
-//         },
-//         'collapsed': <whether the window is collapsed>,
-//         'last_height': <last window height before becoming invisible, may be undefined>,
-//         'min_height': <window minimum height, may be undefined>
-//     }
-// }
-var window_dict = {};
-
-// (Profiling) session directory structure:
-// {
-//     '<session ID>': {
-//         'label': ...,
-//         'result_cache': ...,
-//         'callchain_obj': ...,
-//         'callchain_dict': ...,
-//         'perf_maps_obj': ...,
-//         'perf_maps_cache': ...,
-//         'sampled_diff_dict': ...,
-//         'item_list': ...,
-//         'group_list': ...,
-//         'item_dict': ...,
-//         'callchain_dict': ...,
-//         'metrics_dict': ...,
-//         'tooltip_dict': ...,
-//         'warning_dict': ...,
-//         'general_metrics_dict': ...,
-//         'overall_end_time': ...
-//     }
-// }
-var session_dict = {};
 
 var current_focused_window_id = undefined;
 var largest_z_index = 0;
@@ -633,10 +677,18 @@ $(document).on('change', '#results_combobox', function() {
     });
 });
 
-function setupWindow(window_obj, timeline_group_id, analysis_type,
-                     loading_jquery) {
+function setupWindow(window_obj, type, data) {
+    var loading_jquery = $('#loading').clone();
+    loading_jquery.removeAttr('id');
+    loading_jquery.attr('class', 'loading');
+    loading_jquery.prependTo(window_obj.find('.window_content'));
+    loading_jquery.show();
+
+    window_obj.appendTo('body');
+    changeFocus(window_obj.attr('id'));
+
     var session = session_dict[$('#results_combobox').val()];
-    if (analysis_type === 'flame_graphs') {
+    if (type === 'flame_graphs') {
         window_obj.find('.flamegraph_time_ordered').attr(
             'id', window_obj.attr('id') + '_time_ordered');
         window_obj.find('.flamegraph_time_ordered_label').attr(
@@ -654,10 +706,10 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
         window_obj.find('.window_title').html(
             '[Session: ' + session.label + '] ' +
                 'Flame graphs for ' +
-                session.item_dict[timeline_group_id]);
+                session.item_dict[data.timeline_group_id]);
         window_obj.find('.flamegraph_metric').empty();
 
-        var dict = session.metrics_dict[timeline_group_id];
+        var dict = session.metrics_dict[data.timeline_group_id];
         for (const [k, v] of Object.entries(dict)) {
             window_obj.find('.flamegraph_metric').append(
                 new Option(v.title, k));
@@ -665,14 +717,14 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
 
         window_obj.find('.flamegraph_metric').val('walltime');
         window_obj.find('.flamegraph_time_ordered').prop('checked', false);
-        window_obj.find('.flamegraph').attr('data-id', timeline_group_id);
+        window_obj.find('.flamegraph').attr('data-id', data.timeline_group_id);
 
         var window_id = window_obj.attr('id');
 
-        if (timeline_group_id + '_' +
+        if (data.timeline_group_id + '_' +
             parseFloat($('#threshold_input').val()) in session.result_cache) {
             window_dict[window_id].data.result_obj = session.result_cache[
-                timeline_group_id + '_' + parseFloat($(
+                data.timeline_group_id + '_' + parseFloat($(
                     '#threshold_input').val())];
 
             if (!('walltime' in window_dict[window_id].data.result_obj)) {
@@ -686,7 +738,7 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
 
             loading_jquery.hide();
         } else {
-            var pid_tid = timeline_group_id.split('_');
+            var pid_tid = data.timeline_group_id.split('_');
 
             $.ajax({
                 url: $('#block').attr('result_id') + '/',
@@ -697,7 +749,7 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
                            '#threshold_input').val()) / 100}
             }).done(ajax_obj => {
                 session.result_cache[
-                    timeline_group_id + '_' + parseFloat($(
+                    data.timeline_group_id + '_' + parseFloat($(
                         '#threshold_input').val())] = ajax_obj;
                 window_dict[window_id].data.result_obj = ajax_obj;
 
@@ -721,7 +773,7 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
         }
 
         new ResizeObserver(onWindowResize).observe(window_obj[0]);
-    } else if (analysis_type === 'roofline') {
+    } else if (type === 'roofline') {
         window_obj.find('.window_title').html(
             '[Session: ' + session.label + '] ' + 'Cache-aware roofline model');
         window_obj.find('.roofline_type_select').attr(
@@ -743,20 +795,20 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
             'onclick', 'onRooflineBoundsChange(\'fp\', \'' +
                 window_obj.attr('id') + '\')');
 
-        if (analysis_type in session.result_cache) {
+        if (type in session.result_cache) {
             window_dict[window_obj.attr('id')].data =
-                session.result_cache[analysis_type];
+                session.result_cache[type];
             openRooflinePlot(window_obj,
-                             session.result_cache[analysis_type]);
+                             session.result_cache[type]);
             loading_jquery.hide();
         } else {
             $.ajax({
                 url: $('#block').attr('result_id') + '/',
                 method: 'POST',
                 dataType: 'json',
-                data: {general_analysis: analysis_type}
+                data: {general_analysis: type}
             }).done(ajax_obj => {
-                session.result_cache[analysis_type] = ajax_obj;
+                session.result_cache[type] = ajax_obj;
                 window_dict[window_obj.attr('id')].data = ajax_obj;
                 openRooflinePlot(window_obj, ajax_obj);
                 loading_jquery.hide();
@@ -766,7 +818,7 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
                 onWindowCloseClick(window_obj.attr('id'));
             });
         }
-    } else if (analysis_type === 'code') {
+    } else if (type === 'code') {
 
     }
 }
@@ -994,65 +1046,13 @@ function onMenuItemClick(event, analysis_type, timeline_group_id) {
     $('#thread_menu_block').hide();
     $('#general_analysis_menu_block').hide();
 
-    var session_id = $('#results_combobox').prop('selectedIndex');
-    var index = 0;
-    var new_window_id = undefined;
-
-    if (timeline_group_id === undefined) {
-        new_window_id =
-            `w_${session_id}_${analysis_type}_${index}`;
-
-        while (new_window_id in window_dict) {
-            index++;
-            new_window_id =
-                `w_${session_id}_${analysis_type}_${index}`;
-        }
-    } else {
-        new_window_id =
-            `w_${session_id}_${analysis_type}_${timeline_group_id}_${index}`;
-
-        while (new_window_id in window_dict) {
-            index++;
-            new_window_id =
-                `w_${session_id}_${analysis_type}_${timeline_group_id}_${index}`;
-        }
-    }
-
-    window_dict[new_window_id] = {
-        'type': analysis_type,
-        'data': {},
-        'being_resized': false,
-        'collapsed': false
-    };
-
-    var new_window = createWindowDOM(analysis_type);
+    var new_window = createWindowDOM(analysis_type, timeline_group_id);
     new_window.css('top', event.pageY + 'px');
     new_window.css('left', event.pageX + 'px');
-    new_window.attr('id', new_window_id);
-    new_window.attr('onclick', 'changeFocus(\'' +
-                    new_window.attr('id') + '\')');
-    new_window.attr('onmouseup', 'onWindowMouseUp(\'' +
-                    new_window.attr('id') + '\')');
-    new_window.find('.window_header').attr('onmousedown', 'startDrag(event, \'' +
-                                           new_window.attr('id') + '\')');
-    new_window.find('.window_visibility').attr(
-        'onclick', 'onWindowVisibilityClick(event, \'' +
-            new_window.attr('id') + '\')');
-    new_window.find('.window_close').attr(
-        'onclick', 'onWindowCloseClick(\'' +
-            new_window.attr('id') + '\')');
 
-    var loading = $('#loading').clone();
-    loading.removeAttr('id');
-    loading.attr('class', 'loading');
-    loading.prependTo(new_window.find('.window_content'));
-    loading.show();
-
-    new_window.appendTo('body');
-
-    changeFocus(new_window.attr('id'));
-
-    setupWindow(new_window, timeline_group_id, analysis_type, loading);
+    setupWindow(new_window, analysis_type, {
+        timeline_group_id: timeline_group_id
+    });
 }
 
 function changeFocus(window_id) {
