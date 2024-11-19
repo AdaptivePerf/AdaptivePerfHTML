@@ -424,15 +424,33 @@
       }
 
       .code_content {
-
+          overflow:hidden;
+          display:flex;
+          flex-direction:column;
       }
 
-      .code_box {
-          overflow:scroll;
+      .code_container {
+          overflow:auto;
+      }
+
+      .code_choice {
+          display:flex;
+          flex-direction:row;
+          align-items:center;
+      }
+
+      .code_file {
+          flex-grow:1;
+          margin-right:5px;
+      }
+
+      .code_type {
+          width:150px;
+          margin-right:5px;
       }
     </style>
   </head>
-  <body onclick="onBackgroundClick(event)">
+  <body onclick="closeAllMenus(event)">
     <div id="main">
       <div id="header">
         <h1>AdaptivePerf results</h1>

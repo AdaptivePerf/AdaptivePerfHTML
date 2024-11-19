@@ -152,12 +152,31 @@ function createWindowDOM(type, timeline_group_id) {
 </div>
 `,
         code: `
-<div>
-  <pre>
-    <code class="code_box">
-
-    </code>
-  </pre>
+<div class="code_choice">
+  <select name="file" class="code_file">
+    <option value="" disabled="disabled">
+      File to preview...
+    </option>
+  </select>
+  <select name="type" class="code_type">
+    <option value="" disabled="disabled">
+      Code type...
+    </option>
+    <option value="original" selected="selected">
+      Original
+    </option>
+  </select>
+  <!-- This SVG is from Google Material Icons, originally licensed under
+       Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+       (covered by GNU GPL v3 here) -->
+  <svg class="pointer code_copy_all" xmlns="http://www.w3.org/2000/svg" height="24px"
+       viewBox="0 -960 960 960" width="24px" fill="#000000">
+    <title>Copy all code</title>
+    <path d="M120-220v-80h80v80h-80Zm0-140v-80h80v80h-80Zm0-140v-80h80v80h-80ZM260-80v-80h80v80h-80Zm100-160q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480Zm40 240v-80h80v80h-80Zm-200 0q-33 0-56.5-23.5T120-160h80v80Zm340 0v-80h80q0 33-23.5 56.5T540-80ZM120-640q0-33 23.5-56.5T200-720v80h-80Zm420 80Z" />
+  </svg>
+</div>
+<div class="code_container">
+  <pre><code class="code_box"></code></pre>
 </div>
 `
     };
@@ -222,6 +241,7 @@ function createWindowDOM(type, timeline_group_id) {
 
 var current_focused_window_id = undefined;
 var largest_z_index = 0;
+var code_styles = {};
 
 function getSymbolFromMap(addr, map_name) {
     var session = session_dict[$('#results_combobox').val()];
@@ -555,6 +575,7 @@ $(document).on('change', '#results_combobox', function() {
                                                     data[event.data.file] = {}
                                                     data[event.data.file][
                                                         event.data.line] = 'exact';
+                                                    closeAllMenus();
                                                     openCode(data, event.data.file);
                                             });
                                         }
@@ -646,7 +667,7 @@ $(document).on('change', '#results_combobox', function() {
                         props.event.preventDefault();
                         props.event.stopPropagation();
 
-                        onBackgroundClick(props.event, 'thread_menu_block');
+                        closeAllMenus(props.event, 'thread_menu_block');
                     }
                 });
             }
@@ -683,6 +704,11 @@ $(document).on('change', '#results_combobox', function() {
             });
     });
 });
+
+function closeAllMenus() {
+    $('#thread_menu_block').hide();
+    $('#general_analysis_menu_block').hide();
+}
 
 function setupWindow(window_obj, type, data) {
     var loading_jquery = $('#loading').clone();
@@ -829,7 +855,40 @@ function setupWindow(window_obj, type, data) {
         window_obj.find('.window_title').html(
             '[Session: ' + session.label + '] ' +
                 'Code preview');
+
         window_obj.find('.code_box').text(data.code);
+        for (const f of Object.keys(data.files_and_lines)) {
+            window_obj.find('.code_file').append(
+                new Option(f, f));
+        }
+        window_obj.find('.code_file').val(data.default_file);
+        window_obj.find('.code_copy_all').on('click', {
+            code: data.code
+        }, function(event) {
+            navigator.clipboard.writeText(event.data.code);
+            window.alert('Code copied to clipboard!');
+        });
+
+        var styles = [];
+
+        for (const [line, how] of Object.entries(
+            data.files_and_lines[data.default_file])) {
+
+            if (how === 'exact') {
+                styles.push('#' + window_obj.attr('id') +
+                            ' .hljs-ln-code[data-line-number="' +
+                            line + '"] { background-color: lightblue; }');
+            }
+        }
+
+        if (styles.length > 0) {
+            var style = $('<style>' + styles.join('\n') + '</style>');
+            code_styles[window_obj.attr('id')] = style;
+            $('html > head').append(style);
+        }
+
+        hljs.highlightElement(window_obj.find('.code_box')[0]);
+        hljs.initLineNumbersOnLoad();
         loading_jquery.hide();
     }
 }
@@ -846,9 +905,13 @@ function setupWindow(window_obj, type, data) {
 function openCode(data, default_path) {
     var session = session_dict[$('#results_combobox').val()];
     var load = function(code) {
-        var window = createWindowDOM('code');
-        setupWindow(window, 'code', {
-            code: code
+        var new_window = createWindowDOM('code');
+        new_window.css('top', 'calc(50% - 275px)');
+        new_window.css('left', 'calc(50% - 375px)');
+        setupWindow(new_window, 'code', {
+            code: code,
+            files_and_lines: data,
+            default_file: default_path,
         });
     };
 
@@ -1261,19 +1324,22 @@ function openFlameGraph(window_id, metric) {
     window_obj.find('.flamegraph')[0].scrollTop = 0;
 }
 
-function onBackgroundClick(event, exclude) {
+function closeAllMenus(event, exclude) {
     if (exclude !== 'thread_menu_block' &&
-        !document.getElementById('thread_menu_block').contains(event.target)) {
+        (event === undefined ||
+         !document.getElementById('thread_menu_block').contains(event.target))) {
         $('#thread_menu_block').hide();
     }
 
     if (exclude !== 'settings_block' &&
-        !document.getElementById('settings_block').contains(event.target)) {
+        (event === undefined ||
+         !document.getElementById('settings_block').contains(event.target))) {
         $('#settings_block').hide();
     }
 
     if (exclude !== 'general_analysis_menu_block' &&
-        !document.getElementById('general_analysis_menu_block').contains(event.target)) {
+        (event === undefined ||
+         !document.getElementById('general_analysis_menu_block').contains(event.target))) {
         $('#general_analysis_menu_block').hide();
     }
 }
@@ -1285,6 +1351,12 @@ function windowStopPropagation(event) {
 
 function onWindowCloseClick(window_id) {
     $('#' + window_id).remove();
+
+    if (window_id in code_styles) {
+        code_styles[window_id].remove();
+        delete code_styles[window_id];
+    }
+
     delete window_dict[window_id];
 }
 
@@ -1516,7 +1588,7 @@ function onSettingsClick(event) {
     event.preventDefault();
     event.stopPropagation();
 
-    onBackgroundClick(event, 'settings_block');
+    closeAllMenus(event, 'settings_block');
 }
 
 function onGeneralAnalysesClick(event) {
@@ -1539,5 +1611,5 @@ function onGeneralAnalysesClick(event) {
     event.preventDefault();
     event.stopPropagation();
 
-    onBackgroundClick(event, 'general_analysis_menu_block');
+    closeAllMenus(event, 'general_analysis_menu_block');
 }
