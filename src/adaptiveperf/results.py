@@ -239,13 +239,24 @@ class ProfilingResults:
             with p.open(mode='r') as f:
                 self._sources[name] = json.load(f)
 
-        if (self._path / 'processed' / 'src_index.json').exists() and \
-           (self._path / 'processed' / 'src.zip').exists():
-            with (self._path / 'processed' / 'src_index.json').open(
-                    mode='r') as f:
-                self._source_index = json.load(f)
-
+        if (self._path / 'processed' / 'src.zip').exists():
             self._source_zip_path = self._path / 'processed' / 'src.zip'
+            src_index_path = self._path / 'processed' / 'src_index.json'
+
+            if src_index_path.exists():
+                with src_index_path.open(mode='r') as f:
+                    self._source_index = json.load(f)
+            else:
+                with ZipFile(self._source_zip_path) as zip:
+                    path = ZipFilePath(zip, 'index.json')
+
+                    if path.exists():
+                        with path.open(mode='r') as f:
+                            index_str = f.read()
+
+                        self._source_index = json.loads(index_str)
+                        with src_index_path.open(mode='w') as f:
+                            f.write(index_str)
 
     def get_general_analysis(self, analysis_type):
         """
