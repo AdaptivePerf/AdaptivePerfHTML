@@ -10,7 +10,8 @@
 //         },
 //         'collapsed': <whether the window is collapsed>,
 //         'last_height': <last window height before becoming invisible, may be undefined>,
-//         'min_height': <window minimum height, may be undefined>
+//         'min_height': <window minimum height, may be undefined>,
+//         'last_focus': <last time the window was focused>
 //     }
 // }
 var window_dict = {};
@@ -219,7 +220,8 @@ function createWindowDOM(type, timeline_group_id) {
         'type': type,
         'data': {},
         'being_resized': false,
-        'collapsed': false
+        'collapsed': false,
+        'last_focus': Date.now()
     };
 
     root.attr('id', new_window_id);
@@ -1136,6 +1138,23 @@ function onMenuItemClick(event, analysis_type, timeline_group_id) {
 }
 
 function changeFocus(window_id) {
+    if (window_id === undefined) {
+        var keys = Object.keys(window_dict);
+
+        if (keys.length === 0) {
+            return;
+        }
+
+        keys.sort(function comp(a, b) {
+            return window_dict[b].last_focus - window_dict[a].last_focus;
+        });
+        window_id = keys[0];
+    }
+
+    if (!(window_id in window_dict)) {
+        return;
+    }
+
     var current_window = $('#' + window_id);
     var window_header = current_window.find('.window_header');
 
@@ -1189,6 +1208,7 @@ function changeFocus(window_id) {
         }
 
         current_focused_window_id = window_id;
+        window_dict[window_id].last_focus = Date.now();
     }
 }
 
@@ -1351,13 +1371,8 @@ function windowStopPropagation(event) {
 
 function onWindowCloseClick(window_id) {
     $('#' + window_id).remove();
-
-    if (window_id in code_styles) {
-        code_styles[window_id].remove();
-        delete code_styles[window_id];
-    }
-
     delete window_dict[window_id];
+    changeFocus();
 }
 
 function onMetricChange(window_id, event) {
