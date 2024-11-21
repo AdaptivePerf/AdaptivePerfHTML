@@ -116,9 +116,10 @@ function createWindowDOM(type, timeline_group_id) {
 </span>
 <div class="flamegraph_choice">
   <div class="flamegraph_metric_choice">
-    Metric:
     <select name="metric" class="flamegraph_metric">
-
+      <option value="" disabled="disabled">
+        Metric...
+      </option>
     </select>
     <input type="checkbox" class="flamegraph_time_ordered" />
     <label class="flamegraph_time_ordered_label">Time-ordered</label>
@@ -742,7 +743,16 @@ function setupWindow(window_obj, type, data) {
             '[Session: ' + session.label + '] ' +
                 'Flame graphs for ' +
                 session.item_dict[data.timeline_group_id]);
-        window_obj.find('.flamegraph_metric').empty();
+        var to_remove = [];
+        window_obj.find('.flamegraph_metric > option').each(function() {
+            if (!this.disabled) {
+                to_remove.push($(this));
+            }
+        });
+
+        for (const opt of to_remove) {
+            opt.remove();
+        }
 
         var dict = session.metrics_dict[data.timeline_group_id];
         for (const [k, v] of Object.entries(dict)) {
