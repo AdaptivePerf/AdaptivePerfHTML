@@ -244,7 +244,6 @@ function createWindowDOM(type, timeline_group_id) {
 
 var current_focused_window_id = undefined;
 var largest_z_index = 0;
-var code_styles = {};
 
 function getSymbolFromMap(addr, map_name) {
     var session = session_dict[$('#results_combobox').val()];
@@ -881,26 +880,52 @@ function setupWindow(window_obj, type, data) {
             window.alert('Code copied to clipboard!');
         });
 
-        var styles = [];
+        var line_to_go = undefined;
+
+        hljs.highlightElement(window_obj.find('.code_box')[0]);
+        hljs.lineNumbersBlockSync(window_obj.find('.code_box')[0]);
+
+        var numf = new Intl.NumberFormat('en-US');
 
         for (const [line, how] of Object.entries(
             data.files_and_lines[data.default_file])) {
+            var num_elem = window_obj.find('.hljs-ln-numbers[data-line-number="' + line + '"]');
+            var line_elem = window_obj.find('.hljs-ln-code[data-line-number="' + line + '"]');
+
+            num_elem.css('text-decoration', 'underline');
+            num_elem.css('font-weight', 'bold');
+            num_elem.css('cursor', 'help');
 
             if (how === 'exact') {
-                styles.push('#' + window_obj.attr('id') +
-                            ' .hljs-ln-code[data-line-number="' +
-                            line + '"] { background-color: lightblue; }');
+                num_elem.attr('title', 'Spawned by this line');
+            } else {
+                num_elem.attr('title', numf.format(how[4]) + ' ' +
+                              how[5] + ' (' + (how[3] * 100).toFixed(2) + '%)');
+            }
+
+            var background_color = how === 'exact' ? 'lightgray' :
+                'rgba(' + how[0] + ', ' + how[1] + ', ' + how[2] + ', ' + how[3] + ')';
+
+            line_elem.css('background-color', background_color);
+
+            if (line_to_go === undefined || line < line_to_go) {
+                line_to_go = line;
             }
         }
 
-        if (styles.length > 0) {
-            var style = $('<style>' + styles.join('\n') + '</style>');
-            code_styles[window_obj.attr('id')] = style;
-            $('html > head').append(style);
+        if (line_to_go !== undefined) {
+            if (line_to_go > 3) {
+                line_to_go -= 3;
+            } else {
+                line_to_go = 1;
+            }
+
+            var container = window_obj.find('.code_container');
+            container.scrollTop(window_obj.find(
+                '.hljs-ln-numbers[data-line-number="' + line_to_go + '"]').offset().top -
+                                container.offset().top);
         }
 
-        hljs.highlightElement(window_obj.find('.code_box')[0]);
-        hljs.initLineNumbersOnLoad();
         loading_jquery.hide();
     }
 }
@@ -908,7 +933,9 @@ function setupWindow(window_obj, type, data) {
 // Data should have the following form:
 // {
 //     '<path>': {
-//         '<line number>': '<"exact" or "sampled">'
+//         '<line number>': '<"exact" or [<red in RGB>, <green in RGB>,
+//                                        <blue in RGB>, <alpha from 0.0 to 1.0>,
+//                                        <total value>, <unit string>]>
 //     }
 // }
 //
@@ -1273,7 +1300,6 @@ function updateFlameGraph(window_id, data, always_change_height) {
 }
 
 function openFlameGraph(window_id, metric) {
-    var session = session_dict[$('#results_combobox').val()];
     var window_obj = $('#' + window_id);
     var result_obj = window_dict[window_id].data.result_obj;
     window_dict[window_id].data.flamegraph_obj = flamegraph();
@@ -1292,11 +1318,12 @@ function openFlameGraph(window_id, metric) {
         }
     });
     flamegraph_obj.getName(function(node) {
+        var session = session_dict[$('#results_combobox').val()];
         if (node.data.name in session.callchain_obj[window_obj.find('.flamegraph_metric').val()]) {
             var symbol = session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
-            return getSymbolFromMap(symbol[0], symbol[1]);
+            return String(getSymbolFromMap(symbol[0], symbol[1]));
         } else {
-            return node.data.name;
+            return String(node.data.name);
         }
     });
     flamegraph_obj.onClick(function(node) {
@@ -1318,6 +1345,53 @@ function openFlameGraph(window_id, metric) {
             parent.children = new_children;
             updateFlameGraph(window_id, d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum().data, false);
         }
+    });
+    flamegraph_obj.onContextMenu(function(node) {
+        var session = session_dict[$('#results_combobox').val()];
+        var symbol = session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
+        var offset_dict = session.src_dict[window_obj.find('.flamegraph_metric').val()][symbol[1]];
+
+        if (offset_dict === undefined) {
+            return;
+        }
+
+        var sums = {};
+        var added = false;
+
+        for (const [addr, val] of Object.entries(node.data.offsets)) {
+            var decoded = offset_dict[addr];
+
+            if (decoded === undefined) {
+                continue;
+            }
+
+            added = true;
+
+            if (!(decoded.file in sums)) {
+                sums[decoded['file']] = {};
+            }
+
+            if (!(decoded.line in sums[decoded.file])) {
+                if (node.data.cold) {
+                    sums[decoded.file][decoded.line] = [170, 170, 255, 0, 0, 'unit(s)'];
+                } else {
+                    sums[decoded.file][decoded.line] = [255, 0, 0, 0, 0, 'unit(s)'];
+                }
+            }
+
+            sums[decoded.file][decoded.line][3] += (val / node.data.value);
+            sums[decoded.file][decoded.line][4] += val;
+        }
+
+        if (added) {
+            openCode(sums, Object.keys(sums)[0]);
+        }
+    });
+    flamegraph_obj.setLabelHandler(function(node) {
+        var numf = new Intl.NumberFormat('en-US');
+        var getName = window_dict[window_id].data.flamegraph_obj.getName();
+        return getName(node) + ' (' + numf.format(node.data.value) +
+            ' unit(s), ' + (100 * (node.x1 - node.x0)).toFixed(2) + '%)';
     });
     flamegraph_obj.setSearchHandler(function(results, sum, total) {
         window_obj.find('.flamegraph_search_blocks').html(results.length.toLocaleString());
