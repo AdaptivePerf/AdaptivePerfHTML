@@ -258,7 +258,7 @@ function getSymbolFromMap(addr, map_name) {
         return addr;
     }
 
-    var addr = parseInt(match[1], 16);
+    var addr_int = parseInt(match[1], 16);
 
     if (map_name in session.perf_maps_obj) {
         var data = session.perf_maps_obj[map_name];
@@ -270,10 +270,10 @@ function getSymbolFromMap(addr, map_name) {
             var addr1 = parseInt(data[middle][0], 16);
             var addr2 = parseInt(data[middle][1], 16);
 
-            if (addr >= addr1 && addr <= addr2) {
+            if (addr_int >= addr1 && addr_int <= addr2) {
                 session.perf_maps_cache[[addr, map_name]] = data[middle][2];
                 return data[middle][2];
-            } else if (addr < addr1) {
+            } else if (addr_int < addr1) {
                 end = middle - 1;
             } else {
                 start = middle + 1;
