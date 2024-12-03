@@ -557,9 +557,9 @@ $(document).on('change', '#results_combobox', function() {
                                     var symbol = callchain_obj['syscall'][name];
                                     new_span.text(getSymbolFromMap(symbol[0], symbol[1]));
 
-                                    if (symbol[1] in src_dict.syscall &&
-                                        offset in src_dict.syscall[symbol[1]]) {
-                                        var src = src_dict.syscall[symbol[1]][offset];
+                                    if (symbol[1] in src_dict &&
+                                        offset in src_dict[symbol[1]]) {
+                                        var src = src_dict[symbol[1]][offset];
                                         new_span.attr('title', src.file + ':' + src.line);
 
                                         if (src.file in src_index_dict) {
@@ -866,67 +866,89 @@ function setupWindow(window_obj, type, data) {
         window_obj.find('.window_title').html(
             '[Session: ' + session.label + '] ' +
                 'Code preview');
-
-        window_obj.find('.code_box').text(data.code);
         for (const f of Object.keys(data.files_and_lines)) {
             window_obj.find('.code_file').append(
                 new Option(f, f));
         }
         window_obj.find('.code_file').val(data.default_file);
-        window_obj.find('.code_copy_all').on('click', {
-            code: data.code
-        }, function(event) {
-            navigator.clipboard.writeText(event.data.code);
-            window.alert('Code copied to clipboard!');
-        });
+        window_obj.find('.code_file').attr(
+            'onchange', 'onCodeFileChange(\'' + window_obj.attr('id') + '\', event)');
 
-        var line_to_go = undefined;
+        window_dict[window_obj.attr('id')].data.files_and_lines =
+            structuredClone(data.files_and_lines);
 
-        hljs.highlightElement(window_obj.find('.code_box')[0]);
-        hljs.lineNumbersBlockSync(window_obj.find('.code_box')[0]);
-
-        var numf = new Intl.NumberFormat('en-US');
-
-        for (const [line, how] of Object.entries(
-            data.files_and_lines[data.default_file])) {
-            var num_elem = window_obj.find('.hljs-ln-numbers[data-line-number="' + line + '"]');
-            var line_elem = window_obj.find('.hljs-ln-code[data-line-number="' + line + '"]');
-
-            num_elem.css('text-decoration', 'underline');
-            num_elem.css('font-weight', 'bold');
-            num_elem.css('cursor', 'help');
-
-            if (how === 'exact') {
-                num_elem.attr('title', 'Spawned by this line');
-            } else {
-                num_elem.attr('title', numf.format(how[4]) + ' ' +
-                              how[5] + ' (' + (how[3] * 100).toFixed(2) + '%)');
-            }
-
-            var background_color = how === 'exact' ? 'lightgray' :
-                'rgba(' + how[0] + ', ' + how[1] + ', ' + how[2] + ', ' + how[3] + ')';
-
-            line_elem.css('background-color', background_color);
-
-            if (line_to_go === undefined || line < line_to_go) {
-                line_to_go = line;
-            }
-        }
-
-        if (line_to_go !== undefined) {
-            if (line_to_go > 3) {
-                line_to_go -= 3;
-            } else {
-                line_to_go = 1;
-            }
-
-            var container = window_obj.find('.code_container');
-            container.scrollTop(window_obj.find(
-                '.hljs-ln-numbers[data-line-number="' + line_to_go + '"]').offset().top -
-                                container.offset().top);
-        }
+        prepareCodePreview(window_obj, data.code,
+                           data.files_and_lines[data.default_file])
 
         loading_jquery.hide();
+    }
+}
+
+function prepareCodePreview(window_obj, code, lines) {
+    window_obj.find('.code_container').scrollTop(0);
+    var code_box = window_obj.find('.code_box');
+    code_box.html('');
+
+    for (const attr of code_box[0].attributes) {
+        if (attr.name === 'class') {
+            code_box.attr(attr.name, 'code_box');
+        } else {
+            code_box.attr(attr.name, '');
+        }
+    }
+
+    code_box.text(code);
+    window_obj.find('.code_copy_all').off('click');
+    window_obj.find('.code_copy_all').on('click', {
+        code: code
+    }, function(event) {
+        navigator.clipboard.writeText(event.data.code);
+        window.alert('Code copied to clipboard!');
+    });
+
+    var line_to_go = undefined;
+
+    hljs.highlightElement(window_obj.find('.code_box')[0]);
+    hljs.lineNumbersBlockSync(window_obj.find('.code_box')[0]);
+
+    var numf = new Intl.NumberFormat('en-US');
+
+    for (const [line, how] of Object.entries(lines)) {
+        var num_elem = window_obj.find('.hljs-ln-numbers[data-line-number="' + line + '"]');
+        var line_elem = window_obj.find('.hljs-ln-code[data-line-number="' + line + '"]');
+
+        num_elem.css('text-decoration', 'underline');
+        num_elem.css('font-weight', 'bold');
+        num_elem.css('cursor', 'help');
+
+        if (how === 'exact') {
+            num_elem.attr('title', 'Spawned by this line');
+        } else {
+            num_elem.attr('title', numf.format(how[4]) + ' ' +
+                          how[5] + ' (' + (how[3] * 100).toFixed(2) + '%)');
+        }
+
+        var background_color = how === 'exact' ? 'lightgray' :
+            'rgba(' + how[0] + ', ' + how[1] + ', ' + how[2] + ', ' + how[3] + ')';
+
+        line_elem.css('background-color', background_color);
+
+        if (line_to_go === undefined || line < line_to_go) {
+            line_to_go = line;
+        }
+    }
+
+    if (line_to_go !== undefined) {
+        if (line_to_go > 3) {
+            line_to_go -= 3;
+        } else {
+            line_to_go = 1;
+        }
+
+        var container = window_obj.find('.code_container');
+        container.scrollTop(window_obj.find(
+            '.hljs-ln-numbers[data-line-number="' + line_to_go + '"]').offset().top -
+                            container.offset().top);
     }
 }
 
@@ -966,7 +988,33 @@ function openCode(data, default_path) {
             session.src_cache[default_path] = src_code;
             load(src_code);
         }).fail(ajax_obj => {
+            window.alert('Could not load ' + default_path + '!');
+        });
+    }
+}
 
+function onCodeFileChange(window_id, event) {
+    var session = session_dict[$('#results_combobox').val()];
+    var path = event.currentTarget.value;
+    var load = function(code) {
+        var window_obj = $('#' + window_id);
+        prepareCodePreview(window_obj, code,
+                           window_dict[window_id].data.files_and_lines[path]);
+    };
+
+    if (path in session.src_cache) {
+        load(session.src_cache[path]);
+    } else {
+        $.ajax({
+            url: $('#block').attr('result_id') + '/',
+            method: 'POST',
+            dataType: 'text',
+            data: {src: session.src_index_dict[path]}
+        }).done(src_code => {
+            session.src_cache[path] = src_code;
+            load(src_code);
+        }).fail(ajax_obj => {
+            window.alert('Could not load ' + path + '!');
         });
     }
 }
@@ -1349,7 +1397,7 @@ function openFlameGraph(window_id, metric) {
     flamegraph_obj.onContextMenu(function(node) {
         var session = session_dict[$('#results_combobox').val()];
         var symbol = session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
-        var offset_dict = session.src_dict[window_obj.find('.flamegraph_metric').val()][symbol[1]];
+        var offset_dict = session.src_dict[symbol[1]];
 
         if (offset_dict === undefined) {
             return;

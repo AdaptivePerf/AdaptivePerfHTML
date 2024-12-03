@@ -232,12 +232,10 @@ class ProfilingResults:
         self._source_index = {}
         self._source_zip_path = None
 
-        source_json_files = (self._path / 'processed').glob('*_sources.json')
-
-        for p in source_json_files:
-            name = re.search(r'(.+)_sources\.json', p.name).group(1)
-            with p.open(mode='r') as f:
-                self._sources[name] = json.load(f)
+        if (self._path / 'processed' / 'sources.json').exists():
+            with (self._path / 'processed' / 'sources.json').open(
+                    mode='r') as f:
+                self._sources = json.load(f)
 
         if (self._path / 'processed' / 'src.zip').exists():
             self._source_zip_path = self._path / 'processed' / 'src.zip'
@@ -593,13 +591,11 @@ class ProfilingResults:
         * "src": the JSON object mapping library/executable offsets to
           lines within source code files. This is set only for the root
           and it can be empty. The structure is as follows:
-          {"<event type>": {"<library/executable path>":
-          {"<hex offset>": {"file": "<path>", "line": <number>}}}}.
-          <event type> can be one of: "syscall" (for thread/process tree
-          tracing), "walltime" (for on-CPU/off-CPU profiling), or the name
-          of a custom event specified by the user. Refer to "src_index"
-          (which is also returned by get_json_tree()) and use get_source_code()
-          to obtain a source code corresponding to <path>.
+          {"<library/executable path>":
+          {"<hex offset>": {"file": "<path>", "line": <number>}}}.
+          Refer to "src_index" (which is also returned by get_json_tree())
+          and use get_source_code() to obtain a source code corresponding to
+          <path>.
         * "src_index": the JSON object mapping source code paths inside
           "src" to shortened filenames that should be provided to
           get_source_code(). This is set only for the root and it can be empty.
