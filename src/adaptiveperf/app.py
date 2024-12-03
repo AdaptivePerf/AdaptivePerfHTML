@@ -53,6 +53,9 @@ def post(identifier):
     * "callchain" (with any value):
       This instructs AdaptivePerfHTML to return the session dictionaries
       mapping compressed symbol names to full symbol names.
+    * "src" (with a string value):
+      This instructs AdaptivePerfHTML to return the source code stored
+      in the session under a provided name.
 
     :param str identifier: A profiling session identifier in the form
                            described in the Identifier class docstring.
@@ -66,7 +69,7 @@ def post(identifier):
            'general_analysis' in request.values or \
            ('pid' in request.values and 'tid' in request.values and
             'threshold' in request.values) or \
-           'callchain' in request.values:
+           'callchain' in request.values or 'src' in request.values:
             results = ProfilingResults(app.config['PROFILING_STORAGE'],
                                        identifier)
 
@@ -95,6 +98,13 @@ def post(identifier):
                     return json_data
             elif 'callchain' in request.values:
                 return results.get_callchain_mappings()
+            elif 'src' in request.values:
+                result = results.get_source_code(request.values['src'])
+
+                if result is None:
+                    return '', 404
+
+                return result
         else:
             return '', 400
     except ValueError:

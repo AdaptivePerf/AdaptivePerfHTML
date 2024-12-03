@@ -61,6 +61,24 @@ After opening the website, follow this getting started guide:
 6. Click an analysis result of your choice in a thread/process context menu to open it in a new internal window. You can open as many windows as you wish and every window can be freely moved, resized, and collapsed (by clicking the eye icon in a title bar). All windows persist across profiling sessions (so you can e.g. open two windows side-by-side from two different sessions).
 7. For flame graphs, you can change the profiling metric, switch between non-time-ordered and time-ordered graphs, search for a specific phrase (regular expressions are also supported), interact with the graphs themselves (e.g. zoom in/out), and download them (as PNG for now). For performance reasons, blocks corresponding to less than a specific percentage of samples will be collapsed ("(compressed)" will be shown instead, you can click it to expand it). This behaviour can be adjusted in the settings above the timeline view.
 8. You can open general analysis results (e.g. roofline plots) by clicking the "General analyses" icon next to the settings icon above the timeline view.
+9. **NEW:** When checking the spawning stack trace of a thread/process, you can hover over functions to see the corresponding source code files and line numbers if available. If a function is green, you can also click it to open the source code inside the website, with the spawning line highlighted.
+10. **NEW:** When checking flame graphs, you can right-click a function block to open the corresponding source code (if available, otherwise nothing will happen) inside the website, with most-metric-contributing lines highlighted in different shades of red along with an option to hover over line numbers to check the sampled metric values.
+
+## Third-party libraries used
+Python:
+* [Jinja](https://jinja.palletsprojects.com/en/stable)
+* [treelib](https://github.com/caesar0301/treelib)
+* [Flask](https://flask.palletsprojects.com)
+* [Gunicorn](https://gunicorn.org)
+* [pytest](https://docs.pytest.org/en/stable)
+* [pytest-mock](https://github.com/pytest-dev/pytest-mock)
+
+JavaScript:
+* [d3-flame-graph](https://github.com/AdaptivePerf/d3-flame-graph) (patched and stored in the AdaptivePerf org)
+* [highlight.js](https://highlightjs.org)
+* [highlightjs-line-numbers.js](https://github.com/wcoder/highlightjs-line-numbers.js)
+* [function-plot](https://mauriciopoppe.github.io/function-plot)
+* [vis-timeline](https://github.com/visjs/vis-timeline)
 
 ## Acknowledgements
 The AdaptivePerfHTML development is possible thanks to the following funding sources:

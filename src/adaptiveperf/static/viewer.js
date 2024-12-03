@@ -1,156 +1,6 @@
 // AdaptivePerfHTML: Tool for producing HTML summary of profiling results
 // Copyright (C) CERN. See LICENSE for details.
 
-// Window templates start here
-function createWindowDOM(analysis_type) {
-    const roofline_window = `
-<div class="window roofline_window">
-  <div class="window_header">
-    <span class="window_title"></span>
-    <span class="window_close" onmousedown="windowStopPropagation(event)">
-      <!-- This SVG is from Google Material Icons, originally licensed under
-           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-           (covered by GNU GPL v3 here) -->
-      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
-           viewBox="0 -960 960 960" width="24px">
-        <title>Close</title>
-        <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
-      </svg>
-    </span>
-   <span class="window_visibility" onmousedown="windowStopPropagation(event)">
-      <!-- This SVG is from Google Material Icons, originally licensed under
-           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-           (covered by GNU GPL v3 here) -->
-      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
-           viewBox="0 -960 960 960" width="24px">
-        <title>Toggle visibility</title>
-        <path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/>
-      </svg>
-    </span>
-  </div>
-  <div class="roofline_content window_content">
-    <div class="roofline_box">
-      <div class="roofline_settings">
-        <fieldset class="roofline_type">
-          <legend>Type</legend>
-          <select name="roofline_type" class="roofline_type_select">
-            <option value="" selected="selected" disabled="disabled">
-              Select...
-            </option>
-          </select>
-        </fieldset>
-        <fieldset class="roofline_bounds">
-          <legend>Bounds</legend>
-          <div class="roofline_l1">
-            <b>L1:</b> on
-          </div>
-          <div class="roofline_l2">
-            <b>L2:</b> on
-          </div>
-          <div class="roofline_l3">
-            <b>L3:</b> on
-          </div>
-          <div class="roofline_dram">
-            <b>DRAM:</b> on
-          </div>
-          <div class="roofline_fp" title="There are two performance ceilings: FP_FMA (floating-point ops with FMA instructions) and FP (floating-point ops without FMA instructions). FP_FMA is used for plotting L1/L2/L3/DRAM bounds, but the lower FP ceiling can be plotted as an extra dashed black line since not all programs use FMA.">
-            <b>FP:</b> on
-          </div>
-        </fieldset>
-        <fieldset class="roofline_details">
-          <legend>Details</legend>
-          <span class="roofline_details_text">
-            <i>Please select a roofline type first.</i>
-          </span>
-        </fieldset>
-      </div>
-      <div class="roofline">
-
-      </div>
-    </div>
-  </div>
-</div>
-`;
-
-    const flame_graph_window = `
-<div class="window flamegraph_window">
-  <div class="window_header">
-    <span class="window_title">Flame graphs</span>
-    <span class="window_close" onmousedown="windowStopPropagation(event)">
-      <!-- This SVG is from Google Material Icons, originally licensed under
-           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-           (covered by GNU GPL v3 here) -->
-      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
-           viewBox="0 -960 960 960" width="24px">
-        <title>Close</title>
-        <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
-      </svg>
-    </span>
-   <span class="window_visibility" onmousedown="windowStopPropagation(event)">
-      <!-- This SVG is from Google Material Icons, originally licensed under
-           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-           (covered by GNU GPL v3 here) -->
-      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
-           viewBox="0 -960 960 960" width="24px">
-        <title>Toggle visibility</title>
-        <path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/>
-      </svg>
-    </span>
-  </div>
-  <div class="flamegraph_box window_content">
-    <span class="collapse_info">
-      Some blocks may be collapsed to speed up rendering, but you can expand
-      them by clicking them.
-    </span>
-    <div class="flamegraph_choice">
-      <div class="flamegraph_metric_choice">
-        Metric:
-        <select name="metric" class="flamegraph_metric">
-
-        </select>
-        <input type="checkbox" class="flamegraph_time_ordered" />
-        <label class="flamegraph_time_ordered_label">Time-ordered</label>
-      </div>
-      <div class="flamegraph_remainder">
-        <input type="text" class="flamegraph_search"
-               placeholder="Search..." />
-        <!-- This SVG is from Google Material Icons, originally licensed under
-             Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
-             (covered by GNU GPL v3 here) -->
-        <svg class="pointer flamegraph_download" xmlns="http://www.w3.org/2000/svg" height="24px"
-             viewBox="0 -960 960 960" width="24px" fill="#000000">
-          <title>Download the current flame graph view as PNG</title>
-          <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
-        </svg>
-      </div>
-    </div>
-    <div class="flamegraph_search_results">
-      <b>Search results:</b> <span class="flamegraph_search_blocks"></span> block(s) accounting for
-      <span class="flamegraph_search_found"></span> unit(s) out of
-      <span class="flamegraph_search_total"></span> (<span class="flamegraph_search_percentage"></span>%)
-    </div>
-    <div class="flamegraph scrollable">
-      <p class="no_flamegraph">
-        There is no flame graph associated with the selected process/thread,
-        metric, and time order (or the flame graph could not be loaded)!
-        This may be caused by the inability of capturing a specific event
-        for that process/thread (it is a disadvantage of sampling-based
-        profiling).
-      </p>
-      <div class="flamegraph_svg"></div>
-    </div>
-  </div>
-</div>
-`;
-
-    if (analysis_type === 'flame_graphs') {
-        return $(flame_graph_window);
-    } else if (analysis_type === 'roofline') {
-        return $(roofline_window);
-    }
-}
-// Window templates end here
-
 // Window directory structure:
 // {
 //     '<div ID>': {
@@ -160,7 +10,8 @@ function createWindowDOM(analysis_type) {
 //         },
 //         'collapsed': <whether the window is collapsed>,
 //         'last_height': <last window height before becoming invisible, may be undefined>,
-//         'min_height': <window minimum height, may be undefined>
+//         'min_height': <window minimum height, may be undefined>,
+//         'last_focus': <last time the window was focused>
 //     }
 // }
 var window_dict = {};
@@ -188,19 +39,226 @@ var window_dict = {};
 // }
 var session_dict = {};
 
+// Window templates
+function createWindowDOM(type, timeline_group_id) {
+    const window_header = `
+<div class="window_header">
+    <span class="window_title"></span>
+    <span class="window_close" onmousedown="windowStopPropagation(event)">
+      <!-- This SVG is from Google Material Icons, originally licensed under
+           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+           (covered by GNU GPL v3 here) -->
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
+           viewBox="0 -960 960 960" width="24px">
+        <title>Close</title>
+        <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
+      </svg>
+    </span>
+   <span class="window_visibility" onmousedown="windowStopPropagation(event)">
+      <!-- This SVG is from Google Material Icons, originally licensed under
+           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+           (covered by GNU GPL v3 here) -->
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px"
+           viewBox="0 -960 960 960" width="24px">
+        <title>Toggle visibility</title>
+        <path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/>
+      </svg>
+    </span>
+  </div>
+`;
+
+    const type_dict = {
+        roofline: `
+<div class="roofline_box">
+  <div class="roofline_settings">
+    <fieldset class="roofline_type">
+      <legend>Type</legend>
+      <select name="roofline_type" class="roofline_type_select">
+        <option value="" selected="selected" disabled="disabled">
+          Select...
+        </option>
+      </select>
+    </fieldset>
+    <fieldset class="roofline_bounds">
+      <legend>Bounds</legend>
+      <div class="roofline_l1">
+        <b>L1:</b> on
+      </div>
+      <div class="roofline_l2">
+        <b>L2:</b> on
+      </div>
+      <div class="roofline_l3">
+        <b>L3:</b> on
+      </div>
+      <div class="roofline_dram">
+        <b>DRAM:</b> on
+      </div>
+      <div class="roofline_fp" title="There are two performance ceilings: FP_FMA (floating-point ops with FMA instructions) and FP (floating-point ops without FMA instructions). FP_FMA is used for plotting L1/L2/L3/DRAM bounds, but the lower FP ceiling can be plotted as an extra dashed black line since not all programs use FMA.">
+        <b>FP:</b> on
+      </div>
+    </fieldset>
+    <fieldset class="roofline_details">
+      <legend>Details</legend>
+      <span class="roofline_details_text">
+        <i>Please select a roofline type first.</i>
+      </span>
+    </fieldset>
+  </div>
+  <div class="roofline">
+
+  </div>
+</div>
+`,
+        flame_graphs: `
+<span class="collapse_info">
+  Some blocks may be collapsed to speed up rendering, but you can expand
+  them by clicking them.
+</span>
+<div class="flamegraph_choice">
+  <div class="flamegraph_metric_choice">
+    <select name="metric" class="flamegraph_metric">
+      <option value="" disabled="disabled">
+        Metric...
+      </option>
+    </select>
+    <input type="checkbox" class="flamegraph_time_ordered" />
+    <label class="flamegraph_time_ordered_label">Time-ordered</label>
+  </div>
+  <div class="flamegraph_remainder">
+    <input type="text" class="flamegraph_search"
+           placeholder="Search..." />
+    <!-- This SVG is from Google Material Icons, originally licensed under
+         Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+         (covered by GNU GPL v3 here) -->
+    <svg class="pointer flamegraph_download" xmlns="http://www.w3.org/2000/svg" height="24px"
+         viewBox="0 -960 960 960" width="24px" fill="#000000">
+      <title>Download the current flame graph view as PNG</title>
+      <path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
+    </svg>
+  </div>
+</div>
+<div class="flamegraph_search_results">
+  <b>Search results:</b> <span class="flamegraph_search_blocks"></span> block(s) accounting for
+  <span class="flamegraph_search_found"></span> unit(s) out of
+  <span class="flamegraph_search_total"></span> (<span class="flamegraph_search_percentage"></span>%)
+</div>
+<div class="flamegraph scrollable">
+  <p class="no_flamegraph">
+    There is no flame graph associated with the selected process/thread,
+    metric, and time order (or the flame graph could not be loaded)!
+    This may be caused by the inability of capturing a specific event
+    for that process/thread (it is a disadvantage of sampling-based
+    profiling).
+  </p>
+  <div class="flamegraph_svg"></div>
+</div>
+`,
+        code: `
+<div class="code_choice">
+  <select name="file" class="code_file">
+    <option value="" disabled="disabled">
+      File to preview...
+    </option>
+  </select>
+  <select name="type" class="code_type">
+    <option value="" disabled="disabled">
+      Code type...
+    </option>
+    <option value="original" selected="selected">
+      Original
+    </option>
+  </select>
+  <!-- This SVG is from Google Material Icons, originally licensed under
+       Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+       (covered by GNU GPL v3 here) -->
+  <svg class="pointer code_copy_all" xmlns="http://www.w3.org/2000/svg" height="24px"
+       viewBox="0 -960 960 960" width="24px" fill="#000000">
+    <title>Copy all code</title>
+    <path d="M120-220v-80h80v80h-80Zm0-140v-80h80v80h-80Zm0-140v-80h80v80h-80ZM260-80v-80h80v80h-80Zm100-160q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480Zm40 240v-80h80v80h-80Zm-200 0q-33 0-56.5-23.5T120-160h80v80Zm340 0v-80h80q0 33-23.5 56.5T540-80ZM120-640q0-33 23.5-56.5T200-720v80h-80Zm420 80Z" />
+  </svg>
+</div>
+<div class="code_container">
+  <pre><code class="code_box"></code></pre>
+</div>
+`
+    };
+
+    var root = $('<div></div>');
+    root.attr('class', 'window ' + type + '_window');
+    root.append($(window_header));
+
+    var content = $('<div></div>');
+    content.attr('class', 'window_content ' + type + '_content');
+    content.html(type_dict[type]);
+
+    root.append(content);
+
+    var session_id = $('#results_combobox').prop('selectedIndex');
+    var index = 0;
+    var new_window_id = undefined;
+
+    if (timeline_group_id === undefined) {
+        new_window_id =
+            `w_${session_id}_${type}_${index}`;
+
+        while (new_window_id in window_dict) {
+            index++;
+            new_window_id =
+                `w_${session_id}_${type}_${index}`;
+        }
+    } else {
+        new_window_id =
+            `w_${session_id}_${type}_${timeline_group_id}_${index}`;
+
+        while (new_window_id in window_dict) {
+            index++;
+            new_window_id =
+                `w_${session_id}_${type}_${timeline_group_id}_${index}`;
+        }
+    }
+
+    window_dict[new_window_id] = {
+        'type': type,
+        'data': {},
+        'being_resized': false,
+        'collapsed': false,
+        'last_focus': Date.now()
+    };
+
+    root.attr('id', new_window_id);
+    root.attr('onclick', 'changeFocus(\'' +
+              root.attr('id') + '\')');
+    root.attr('onmouseup', 'onWindowMouseUp(\'' +
+              root.attr('id') + '\')');
+    root.find('.window_header').attr('onmousedown', 'startDrag(event, \'' +
+                                     root.attr('id') + '\')');
+    root.find('.window_visibility').attr(
+        'onclick', 'onWindowVisibilityClick(event, \'' +
+            root.attr('id') + '\')');
+    root.find('.window_close').attr(
+        'onclick', 'onWindowCloseClick(\'' +
+            root.attr('id') + '\')');
+
+    return root;
+}
+
 var current_focused_window_id = undefined;
 var largest_z_index = 0;
 
-function getSymbolFromMap(elem) {
+function getSymbolFromMap(addr, map_name) {
     var session = session_dict[$('#results_combobox').val()];
-    if (elem in session.perf_maps_cache) {
-        return session.perf_maps_cache[elem];
+    if ([addr, map_name] in session.perf_maps_cache) {
+        return session.perf_maps_cache[[addr, map_name]];
     }
 
-    var regex = /^\((0x[0-9a-f]+);(.+)\)$/;
-    var match = regex.exec(elem);
-    var addr = parseInt(match[1], 16);
-    var map_name = match[2];
+    var regex = /^\[(0x[0-9a-f]+)\]$/;
+    var match = regex.exec(addr);
+
+    if (match == null) {
+        return addr;
+    }
+
+    var addr_int = parseInt(match[1], 16);
 
     if (map_name in session.perf_maps_obj) {
         var data = session.perf_maps_obj[map_name];
@@ -212,10 +270,10 @@ function getSymbolFromMap(elem) {
             var addr1 = parseInt(data[middle][0], 16);
             var addr2 = parseInt(data[middle][1], 16);
 
-            if (addr >= addr1 && addr <= addr2) {
-                session.perf_maps_cache[elem] = data[middle][2];
+            if (addr_int >= addr1 && addr_int <= addr2) {
+                session.perf_maps_cache[[addr, map_name]] = data[middle][2];
                 return data[middle][2];
-            } else if (addr < addr1) {
+            } else if (addr_int < addr1) {
                 end = middle - 1;
             } else {
                 start = middle + 1;
@@ -223,7 +281,7 @@ function getSymbolFromMap(elem) {
         }
     }
 
-    return elem;
+    return addr;
 }
 
 $(document).on('change', '#results_combobox', function() {
@@ -253,7 +311,8 @@ $(document).on('change', '#results_combobox', function() {
                                        callchain_dict, tooltip_dict,
                                        warning_dict, overall_end_time,
                                        general_metrics_dict,
-                                       sampled_diff_dict) {
+                                       sampled_diff_dict,
+                                       src_dict, src_index_dict) {
                 var item = {
                     id: json.id,
                     group: json.id,
@@ -332,6 +391,14 @@ $(document).on('change', '#results_combobox', function() {
                     Object.assign(general_metrics_dict, json.general_metrics);
                 }
 
+                if ('src' in json && $.isEmptyObject(src_dict)) {
+                    Object.assign(src_dict, json.src);
+                }
+
+                if ('src_index' in json && $.isEmptyObject(src_index_dict)) {
+                    Object.assign(src_index_dict, json.src_index);
+                }
+
                 if (level > 0) {
                     callchain_dict[item.id] = json.start_callchain;
                 }
@@ -373,7 +440,9 @@ $(document).on('change', '#results_combobox', function() {
                                       warning_dict,
                                       overall_end_time,
                                       general_metrics_dict,
-                                      sampled_diff_dict);
+                                      sampled_diff_dict,
+                                      src_dict,
+                                      src_index_dict);
                 }
             }
 
@@ -409,7 +478,10 @@ $(document).on('change', '#results_combobox', function() {
                     session_dict[value].perf_maps_cache = {};
                     session_dict[value].result_cache = {};
                     session_dict[value].sampled_diff_dict = {};
+                    session_dict[value].src_dict = {};
+                    session_dict[value].src_index_dict = {};
                     session_dict[value].overall_end_time = [0];
+                    session_dict[value].src_cache = {};
 
                     from_json_to_item(JSON.parse(result), 0,
                                       session_dict[value].item_list,
@@ -421,7 +493,9 @@ $(document).on('change', '#results_combobox', function() {
                                       session_dict[value].warning_dict,
                                       session_dict[value].overall_end_time,
                                       session_dict[value].general_metrics_dict,
-                                      session_dict[value].sampled_diff_dict);
+                                      session_dict[value].sampled_diff_dict,
+                                      session_dict[value].src_dict,
+                                      session_dict[value].src_index_dict);
                 }
 
                 var container = $('#block')[0];
@@ -467,25 +541,63 @@ $(document).on('change', '#results_combobox', function() {
                         var warning_dict = session_dict[value].warning_dict;
                         var general_metrics_dict = session_dict[value].general_metrics_dict;
                         var sampled_diff_dict = session_dict[value].sampled_diff_dict;
+                        var src_dict = session_dict[value].src_dict;
+                        var src_index_dict = session_dict[value].src_index_dict;
 
                         if (props.group in callchain_dict) {
-                            $('#callchain').text(callchain_dict[props.group].map(elem => {
+                            $('#callchain').html('');
+
+                            var first = true;
+                            for (const [name, offset] of callchain_dict[props.group]) {
+                                var new_span = $('<span></span>');
+                                new_span.css('cursor', 'help');
+
                                 if (callchain_obj !== undefined &&
-                                    elem in callchain_obj['syscall']) {
-                                    return callchain_obj['syscall'][elem];
-                                } else if (/^\(0x[0-9a-f]+;.+\)$/.test(elem)) {
-                                    return getSymbolFromMap(elem);
-                                } else if (/^\[.+\]$/.test(elem) ||
-                                           /^\(0x[0-9a-f]+\)$/.test(elem)) {
-                                    return elem;
+                                    name in callchain_obj['syscall']) {
+                                    var symbol = callchain_obj['syscall'][name];
+                                    new_span.text(getSymbolFromMap(symbol[0], symbol[1]));
+
+                                    if (symbol[1] in src_dict &&
+                                        offset in src_dict[symbol[1]]) {
+                                        var src = src_dict[symbol[1]][offset];
+                                        new_span.attr('title', src.file + ':' + src.line);
+
+                                        if (src.file in src_index_dict) {
+                                            new_span.css('color', 'green');
+                                            new_span.css('font-weight', 'bold');
+                                            new_span.css('text-decoration', 'underline');
+                                            new_span.css('cursor', 'pointer');
+
+                                            new_span.on(
+                                                'click', {file: src.file,
+                                                          filename: src_index_dict[src.file],
+                                                          line: src.line},
+                                                function(event) {
+                                                    var data = {};
+                                                    data[event.data.file] = {}
+                                                    data[event.data.file][
+                                                        event.data.line] = 'exact';
+                                                    closeAllMenus();
+                                                    openCode(data, event.data.file);
+                                            });
+                                        }
+                                    } else {
+                                        new_span.attr('title', symbol[1] + '+' + offset);
+                                    }
                                 } else {
-                                    return elem +
-                                        ' (not-yet-loaded or missing ' +
-                                        'callchain dictionary)';
+                                    new_span.text(name +
+                                                  ' (not-yet-loaded or missing ' +
+                                                  'callchain dictionary)');
                                 }
-                            }).join('\n'));
-                            $('#callchain').html(
-                                $('#callchain').html().replace(/\n/g, '<br />'));
+
+                                if (first) {
+                                    first = false;
+                                } else {
+                                    $('#callchain').append('<br />');
+                                }
+
+                                $('#callchain').append(new_span);
+                            }
                             $('#callchain_item').show();
                         } else {
                             $('#callchain_item').hide();
@@ -557,7 +669,7 @@ $(document).on('change', '#results_combobox', function() {
                         props.event.preventDefault();
                         props.event.stopPropagation();
 
-                        onBackgroundClick(props.event, 'thread_menu_block');
+                        closeAllMenus(props.event, 'thread_menu_block');
                     }
                 });
             }
@@ -595,10 +707,23 @@ $(document).on('change', '#results_combobox', function() {
     });
 });
 
-function setupWindow(window_obj, timeline_group_id, analysis_type,
-                     loading_jquery) {
+function closeAllMenus() {
+    $('#thread_menu_block').hide();
+    $('#general_analysis_menu_block').hide();
+}
+
+function setupWindow(window_obj, type, data) {
+    var loading_jquery = $('#loading').clone();
+    loading_jquery.removeAttr('id');
+    loading_jquery.attr('class', 'loading');
+    loading_jquery.prependTo(window_obj.find('.window_content'));
+    loading_jquery.show();
+
+    window_obj.appendTo('body');
+    changeFocus(window_obj.attr('id'));
+
     var session = session_dict[$('#results_combobox').val()];
-    if (analysis_type === 'flame_graphs') {
+    if (type === 'flame_graphs') {
         window_obj.find('.flamegraph_time_ordered').attr(
             'id', window_obj.attr('id') + '_time_ordered');
         window_obj.find('.flamegraph_time_ordered_label').attr(
@@ -616,10 +741,19 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
         window_obj.find('.window_title').html(
             '[Session: ' + session.label + '] ' +
                 'Flame graphs for ' +
-                session.item_dict[timeline_group_id]);
-        window_obj.find('.flamegraph_metric').empty();
+                session.item_dict[data.timeline_group_id]);
+        var to_remove = [];
+        window_obj.find('.flamegraph_metric > option').each(function() {
+            if (!this.disabled) {
+                to_remove.push($(this));
+            }
+        });
 
-        var dict = session.metrics_dict[timeline_group_id];
+        for (const opt of to_remove) {
+            opt.remove();
+        }
+
+        var dict = session.metrics_dict[data.timeline_group_id];
         for (const [k, v] of Object.entries(dict)) {
             window_obj.find('.flamegraph_metric').append(
                 new Option(v.title, k));
@@ -627,14 +761,14 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
 
         window_obj.find('.flamegraph_metric').val('walltime');
         window_obj.find('.flamegraph_time_ordered').prop('checked', false);
-        window_obj.find('.flamegraph').attr('data-id', timeline_group_id);
+        window_obj.find('.flamegraph').attr('data-id', data.timeline_group_id);
 
         var window_id = window_obj.attr('id');
 
-        if (timeline_group_id + '_' +
+        if (data.timeline_group_id + '_' +
             parseFloat($('#threshold_input').val()) in session.result_cache) {
             window_dict[window_id].data.result_obj = session.result_cache[
-                timeline_group_id + '_' + parseFloat($(
+                data.timeline_group_id + '_' + parseFloat($(
                     '#threshold_input').val())];
 
             if (!('walltime' in window_dict[window_id].data.result_obj)) {
@@ -648,7 +782,7 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
 
             loading_jquery.hide();
         } else {
-            var pid_tid = timeline_group_id.split('_');
+            var pid_tid = data.timeline_group_id.split('_');
 
             $.ajax({
                 url: $('#block').attr('result_id') + '/',
@@ -659,7 +793,7 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
                            '#threshold_input').val()) / 100}
             }).done(ajax_obj => {
                 session.result_cache[
-                    timeline_group_id + '_' + parseFloat($(
+                    data.timeline_group_id + '_' + parseFloat($(
                         '#threshold_input').val())] = ajax_obj;
                 window_dict[window_id].data.result_obj = ajax_obj;
 
@@ -683,7 +817,7 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
         }
 
         new ResizeObserver(onWindowResize).observe(window_obj[0]);
-    } else if (analysis_type === 'roofline') {
+    } else if (type === 'roofline') {
         window_obj.find('.window_title').html(
             '[Session: ' + session.label + '] ' + 'Cache-aware roofline model');
         window_obj.find('.roofline_type_select').attr(
@@ -705,20 +839,20 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
             'onclick', 'onRooflineBoundsChange(\'fp\', \'' +
                 window_obj.attr('id') + '\')');
 
-        if (analysis_type in session.result_cache) {
+        if (type in session.result_cache) {
             window_dict[window_obj.attr('id')].data =
-                session.result_cache[analysis_type];
+                session.result_cache[type];
             openRooflinePlot(window_obj,
-                             session.result_cache[analysis_type]);
+                             session.result_cache[type]);
             loading_jquery.hide();
         } else {
             $.ajax({
                 url: $('#block').attr('result_id') + '/',
                 method: 'POST',
                 dataType: 'json',
-                data: {general_analysis: analysis_type}
+                data: {general_analysis: type}
             }).done(ajax_obj => {
-                session.result_cache[analysis_type] = ajax_obj;
+                session.result_cache[type] = ajax_obj;
                 window_dict[window_obj.attr('id')].data = ajax_obj;
                 openRooflinePlot(window_obj, ajax_obj);
                 loading_jquery.hide();
@@ -728,6 +862,160 @@ function setupWindow(window_obj, timeline_group_id, analysis_type,
                 onWindowCloseClick(window_obj.attr('id'));
             });
         }
+    } else if (type === 'code') {
+        window_obj.find('.window_title').html(
+            '[Session: ' + session.label + '] ' +
+                'Code preview');
+        for (const f of Object.keys(data.files_and_lines)) {
+            window_obj.find('.code_file').append(
+                new Option(f, f));
+        }
+        window_obj.find('.code_file').val(data.default_file);
+        window_obj.find('.code_file').attr(
+            'onchange', 'onCodeFileChange(\'' + window_obj.attr('id') + '\', event)');
+
+        window_dict[window_obj.attr('id')].data.files_and_lines =
+            structuredClone(data.files_and_lines);
+
+        prepareCodePreview(window_obj, data.code,
+                           data.files_and_lines[data.default_file])
+
+        loading_jquery.hide();
+    }
+}
+
+function prepareCodePreview(window_obj, code, lines) {
+    window_obj.find('.code_container').scrollTop(0);
+    var code_box = window_obj.find('.code_box');
+    code_box.html('');
+
+    for (const attr of code_box[0].attributes) {
+        if (attr.name === 'class') {
+            code_box.attr(attr.name, 'code_box');
+        } else {
+            code_box.attr(attr.name, '');
+        }
+    }
+
+    code_box.text(code);
+    window_obj.find('.code_copy_all').off('click');
+    window_obj.find('.code_copy_all').on('click', {
+        code: code
+    }, function(event) {
+        navigator.clipboard.writeText(event.data.code);
+        window.alert('Code copied to clipboard!');
+    });
+
+    var line_to_go = undefined;
+
+    hljs.highlightElement(window_obj.find('.code_box')[0]);
+    hljs.lineNumbersBlockSync(window_obj.find('.code_box')[0]);
+
+    var numf = new Intl.NumberFormat('en-US');
+
+    for (const [line, how] of Object.entries(lines)) {
+        var num_elem = window_obj.find('.hljs-ln-numbers[data-line-number="' + line + '"]');
+        var line_elem = window_obj.find('.hljs-ln-code[data-line-number="' + line + '"]');
+
+        num_elem.css('text-decoration', 'underline');
+        num_elem.css('font-weight', 'bold');
+        num_elem.css('cursor', 'help');
+
+        if (how === 'exact') {
+            num_elem.attr('title', 'Spawned by this line');
+        } else {
+            num_elem.attr('title', numf.format(how[4]) + ' ' +
+                          how[5] + ' (' + (how[3] * 100).toFixed(2) + '%)');
+        }
+
+        var background_color = how === 'exact' ? 'lightgray' :
+            'rgba(' + how[0] + ', ' + how[1] + ', ' + how[2] + ', ' + how[3] + ')';
+
+        line_elem.css('background-color', background_color);
+
+        if (line_to_go === undefined || line < line_to_go) {
+            line_to_go = line;
+        }
+    }
+
+    if (line_to_go !== undefined) {
+        if (line_to_go > 3) {
+            line_to_go -= 3;
+        } else {
+            line_to_go = 1;
+        }
+
+        var container = window_obj.find('.code_container');
+        container.scrollTop(window_obj.find(
+            '.hljs-ln-numbers[data-line-number="' + line_to_go + '"]').offset().top -
+                            container.offset().top);
+    }
+}
+
+// Data should have the following form:
+// {
+//     '<path>': {
+//         '<line number>': '<"exact" or [<red in RGB>, <green in RGB>,
+//                                        <blue in RGB>, <alpha from 0.0 to 1.0>,
+//                                        <total value>, <unit string>]>
+//     }
+// }
+//
+// default_path corresponds to <path> to be displayed first
+// when a code preview window is shown.
+function openCode(data, default_path) {
+    var session = session_dict[$('#results_combobox').val()];
+    var load = function(code) {
+        var new_window = createWindowDOM('code');
+        new_window.css('top', 'calc(50% - 275px)');
+        new_window.css('left', 'calc(50% - 375px)');
+        setupWindow(new_window, 'code', {
+            code: code,
+            files_and_lines: data,
+            default_file: default_path,
+        });
+    };
+
+    if (default_path in session.src_cache) {
+        load(session.src_cache[default_path]);
+    } else {
+        $.ajax({
+            url: $('#block').attr('result_id') + '/',
+            method: 'POST',
+            dataType: 'text',
+            data: {src: session.src_index_dict[default_path]}
+        }).done(src_code => {
+            session.src_cache[default_path] = src_code;
+            load(src_code);
+        }).fail(ajax_obj => {
+            window.alert('Could not load ' + default_path + '!');
+        });
+    }
+}
+
+function onCodeFileChange(window_id, event) {
+    var session = session_dict[$('#results_combobox').val()];
+    var path = event.currentTarget.value;
+    var load = function(code) {
+        var window_obj = $('#' + window_id);
+        prepareCodePreview(window_obj, code,
+                           window_dict[window_id].data.files_and_lines[path]);
+    };
+
+    if (path in session.src_cache) {
+        load(session.src_cache[path]);
+    } else {
+        $.ajax({
+            url: $('#block').attr('result_id') + '/',
+            method: 'POST',
+            dataType: 'text',
+            data: {src: session.src_index_dict[path]}
+        }).done(src_code => {
+            session.src_cache[path] = src_code;
+            load(src_code);
+        }).fail(ajax_obj => {
+            window.alert('Could not load ' + path + '!');
+        });
     }
 }
 
@@ -925,68 +1213,33 @@ function onMenuItemClick(event, analysis_type, timeline_group_id) {
     $('#thread_menu_block').hide();
     $('#general_analysis_menu_block').hide();
 
-    var session_id = $('#results_combobox').prop('selectedIndex');
-    var index = 0;
-    var new_window_id = undefined;
-
-    if (timeline_group_id === undefined) {
-        new_window_id =
-            `w_${session_id}_${analysis_type}_${index}`;
-
-        while (new_window_id in window_dict) {
-            index++;
-            new_window_id =
-                `w_${session_id}_${analysis_type}_${index}`;
-        }
-    } else {
-        new_window_id =
-            `w_${session_id}_${analysis_type}_${timeline_group_id}_${index}`;
-
-        while (new_window_id in window_dict) {
-            index++;
-            new_window_id =
-                `w_${session_id}_${analysis_type}_${timeline_group_id}_${index}`;
-        }
-    }
-
-    window_dict[new_window_id] = {
-        'type': analysis_type,
-        'data': {},
-        'being_resized': false,
-        'collapsed': false
-    };
-
-    var new_window = createWindowDOM(analysis_type);
+    var new_window = createWindowDOM(analysis_type, timeline_group_id);
     new_window.css('top', event.pageY + 'px');
     new_window.css('left', event.pageX + 'px');
-    new_window.attr('id', new_window_id);
-    new_window.attr('onclick', 'changeFocus(\'' +
-                    new_window.attr('id') + '\')');
-    new_window.attr('onmouseup', 'onWindowMouseUp(\'' +
-                    new_window.attr('id') + '\')');
-    new_window.find('.window_header').attr('onmousedown', 'startDrag(event, \'' +
-                                           new_window.attr('id') + '\')');
-    new_window.find('.window_visibility').attr(
-        'onclick', 'onWindowVisibilityClick(event, \'' +
-            new_window.attr('id') + '\')');
-    new_window.find('.window_close').attr(
-        'onclick', 'onWindowCloseClick(\'' +
-            new_window.attr('id') + '\')');
 
-    var loading = $('#loading').clone();
-    loading.removeAttr('id');
-    loading.attr('class', 'loading');
-    loading.prependTo(new_window.find('.window_content'));
-    loading.show();
-
-    new_window.appendTo('body');
-
-    changeFocus(new_window.attr('id'));
-
-    setupWindow(new_window, timeline_group_id, analysis_type, loading);
+    setupWindow(new_window, analysis_type, {
+        timeline_group_id: timeline_group_id
+    });
 }
 
 function changeFocus(window_id) {
+    if (window_id === undefined) {
+        var keys = Object.keys(window_dict);
+
+        if (keys.length === 0) {
+            return;
+        }
+
+        keys.sort(function comp(a, b) {
+            return window_dict[b].last_focus - window_dict[a].last_focus;
+        });
+        window_id = keys[0];
+    }
+
+    if (!(window_id in window_dict)) {
+        return;
+    }
+
     var current_window = $('#' + window_id);
     var window_header = current_window.find('.window_header');
 
@@ -1040,6 +1293,7 @@ function changeFocus(window_id) {
         }
 
         current_focused_window_id = window_id;
+        window_dict[window_id].last_focus = Date.now();
     }
 }
 
@@ -1094,7 +1348,6 @@ function updateFlameGraph(window_id, data, always_change_height) {
 }
 
 function openFlameGraph(window_id, metric) {
-    var session = session_dict[$('#results_combobox').val()];
     var window_obj = $('#' + window_id);
     var result_obj = window_dict[window_id].data.result_obj;
     window_dict[window_id].data.flamegraph_obj = flamegraph();
@@ -1113,12 +1366,12 @@ function openFlameGraph(window_id, metric) {
         }
     });
     flamegraph_obj.getName(function(node) {
+        var session = session_dict[$('#results_combobox').val()];
         if (node.data.name in session.callchain_obj[window_obj.find('.flamegraph_metric').val()]) {
-            return session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
-        } else if (/^\(0x[0-9a-f]+;.+\)$/.test(node.data.name)) {
-            return getSymbolFromMap(node.data.name);
+            var symbol = session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
+            return String(getSymbolFromMap(symbol[0], symbol[1]));
         } else {
-            return node.data.name;
+            return String(node.data.name);
         }
     });
     flamegraph_obj.onClick(function(node) {
@@ -1140,6 +1393,53 @@ function openFlameGraph(window_id, metric) {
             parent.children = new_children;
             updateFlameGraph(window_id, d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum().data, false);
         }
+    });
+    flamegraph_obj.onContextMenu(function(node) {
+        var session = session_dict[$('#results_combobox').val()];
+        var symbol = session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
+        var offset_dict = session.src_dict[symbol[1]];
+
+        if (offset_dict === undefined) {
+            return;
+        }
+
+        var sums = {};
+        var added = false;
+
+        for (const [addr, val] of Object.entries(node.data.offsets)) {
+            var decoded = offset_dict[addr];
+
+            if (decoded === undefined) {
+                continue;
+            }
+
+            added = true;
+
+            if (!(decoded.file in sums)) {
+                sums[decoded['file']] = {};
+            }
+
+            if (!(decoded.line in sums[decoded.file])) {
+                if (node.data.cold) {
+                    sums[decoded.file][decoded.line] = [170, 170, 255, 0, 0, 'unit(s)'];
+                } else {
+                    sums[decoded.file][decoded.line] = [255, 0, 0, 0, 0, 'unit(s)'];
+                }
+            }
+
+            sums[decoded.file][decoded.line][3] += (val / node.data.value);
+            sums[decoded.file][decoded.line][4] += val;
+        }
+
+        if (added) {
+            openCode(sums, Object.keys(sums)[0]);
+        }
+    });
+    flamegraph_obj.setLabelHandler(function(node) {
+        var numf = new Intl.NumberFormat('en-US');
+        var getName = window_dict[window_id].data.flamegraph_obj.getName();
+        return getName(node) + ' (' + numf.format(node.data.value) +
+            ' unit(s), ' + (100 * (node.x1 - node.x0)).toFixed(2) + '%)';
     });
     flamegraph_obj.setSearchHandler(function(results, sum, total) {
         window_obj.find('.flamegraph_search_blocks').html(results.length.toLocaleString());
@@ -1176,19 +1476,22 @@ function openFlameGraph(window_id, metric) {
     window_obj.find('.flamegraph')[0].scrollTop = 0;
 }
 
-function onBackgroundClick(event, exclude) {
+function closeAllMenus(event, exclude) {
     if (exclude !== 'thread_menu_block' &&
-        !document.getElementById('thread_menu_block').contains(event.target)) {
+        (event === undefined ||
+         !document.getElementById('thread_menu_block').contains(event.target))) {
         $('#thread_menu_block').hide();
     }
 
     if (exclude !== 'settings_block' &&
-        !document.getElementById('settings_block').contains(event.target)) {
+        (event === undefined ||
+         !document.getElementById('settings_block').contains(event.target))) {
         $('#settings_block').hide();
     }
 
     if (exclude !== 'general_analysis_menu_block' &&
-        !document.getElementById('general_analysis_menu_block').contains(event.target)) {
+        (event === undefined ||
+         !document.getElementById('general_analysis_menu_block').contains(event.target))) {
         $('#general_analysis_menu_block').hide();
     }
 }
@@ -1201,6 +1504,7 @@ function windowStopPropagation(event) {
 function onWindowCloseClick(window_id) {
     $('#' + window_id).remove();
     delete window_dict[window_id];
+    changeFocus();
 }
 
 function onMetricChange(window_id, event) {
@@ -1431,7 +1735,7 @@ function onSettingsClick(event) {
     event.preventDefault();
     event.stopPropagation();
 
-    onBackgroundClick(event, 'settings_block');
+    closeAllMenus(event, 'settings_block');
 }
 
 function onGeneralAnalysesClick(event) {
@@ -1454,5 +1758,5 @@ function onGeneralAnalysesClick(event) {
     event.preventDefault();
     event.stopPropagation();
 
-    onBackgroundClick(event, 'general_analysis_menu_block');
+    closeAllMenus(event, 'general_analysis_menu_block');
 }
