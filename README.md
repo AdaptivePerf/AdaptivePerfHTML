@@ -64,6 +64,22 @@ After opening the website, follow this getting started guide:
 9. **NEW:** When checking the spawning stack trace of a thread/process, you can hover over functions to see the corresponding source code files and line numbers if available. If a function is green, you can also click it to open the source code inside the website, with the spawning line highlighted.
 10. **NEW:** When checking flame graphs, you can right-click a function block to open the corresponding source code (if available, otherwise nothing will happen) inside the website, with most-metric-contributing lines highlighted in different shades of red along with an option to hover over line numbers to check the sampled metric values.
 
+## Third-party libraries used
+Python:
+* [Jinja](https://jinja.palletsprojects.com/en/stable)
+* [treelib](https://github.com/caesar0301/treelib)
+* [Flask](https://flask.palletsprojects.com)
+* [Gunicorn](https://gunicorn.org)
+* [pytest](https://docs.pytest.org/en/stable)
+* [pytest-mock](https://github.com/pytest-dev/pytest-mock)
+
+JavaScript:
+* [d3-flame-graph](https://github.com/AdaptivePerf/d3-flame-graph) (patched and stored in the AdaptivePerf org)
+* [highlight.js](https://highlightjs.org)
+* [highlightjs-line-numbers.js](https://github.com/wcoder/highlightjs-line-numbers.js)
+* [function-plot](https://mauriciopoppe.github.io/function-plot)
+* [vis-timeline](https://github.com/visjs/vis-timeline)
+
 ## Acknowledgements
 The AdaptivePerfHTML development is possible thanks to the following funding sources:
 * The European Union HE research and innovation programme, grant agreement No 101092877 (SYCLOPS).
