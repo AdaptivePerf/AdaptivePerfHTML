@@ -212,6 +212,8 @@ class ProfilingResults:
             }
         }
 
+        self._roofline_info = {}
+
         if metrics_path.exists():
             with metrics_path.open(mode='r') as f:
                 for line in f:
@@ -220,6 +222,27 @@ class ProfilingResults:
                         'title': match.group(2),
                         'flame_graph': True
                     }
+
+                    carm_match = re.search(r'^CARM_(\S+)$', match.group(2))
+                    if carm_match is not None:
+                        # Assuming Intel-x86-like for now, TODO: CPU type
+                        # detection in AdaptivePerf
+                        self._roofline_info = {
+                            'cpu_type': 'Intel_x86',
+                            'ai_keys': [
+                                'mem_inst_retired.any'
+                            ],
+                            'instr_keys': [
+                                'fp_arith_inst_retired.scalar_single',
+                                'fp_arith_inst_retired.scalar_double',
+                                'fp_arith_inst_retired.128b_packed_single',
+                                'fp_arith_inst_retired.128b_packed_double',
+                                'fp_arith_inst_retired.256b_packed_single',
+                                'fp_arith_inst_retired.256b_packed_double',
+                                'fp_arith_inst_retired.512b_packed_single',
+                                'fp_arith_inst_retired.512b_packed_double'
+                            ]
+                        }
 
         self._general_metrics = {}
 
@@ -602,6 +625,12 @@ class ProfilingResults:
         * "children": the list of all threads/processes spawned by the
           thread/process. Each element has the same structure as the root
           except for "general_metrics" which is absent.
+        * "roofline": the JSON object with information necessary for
+          interpreting roofline profiling results. The structure is as follows:
+          {"cpu_type": "<CPU type, e.g. Intel_x86>", "ai_keys": [<events for
+          calculating arithmetic intensity>], "instr_keys": [<events for
+          calculating FLOPS etc.>]}. This is set only for the root and
+          it can be empty.
         """
         def to_ms(num):
             return None if num is None else num / 1000000
@@ -646,6 +675,7 @@ class ProfilingResults:
                 to_return['general_metrics'] = self._general_metrics
                 to_return['src'] = self._sources
                 to_return['src_index'] = self._source_index
+                to_return['roofline'] = self._roofline_info
 
             children = tree.children(node.identifier)
 

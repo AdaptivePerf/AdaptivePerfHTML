@@ -8,6 +8,7 @@
 //         'data': {
 //             <data relevant to analysis type>
 //         },
+//         'session': <session ID corresponding to the window>,
 //         'collapsed': <whether the window is collapsed>,
 //         'last_height': <last window height before becoming invisible, may be undefined>,
 //         'min_height': <window minimum height, may be undefined>,
@@ -34,7 +35,9 @@ var window_dict = {};
 //         'tooltip_dict': ...,
 //         'warning_dict': ...,
 //         'general_metrics_dict': ...,
-//         'overall_end_time': ...
+//         'overall_end_time': ...,
+//         'roofline_dict': ...,
+//         'roofline_info': ...
 //     }
 // }
 var session_dict = {};
@@ -97,11 +100,36 @@ function createWindowDOM(type, timeline_group_id) {
         <b>FP:</b> on
       </div>
     </fieldset>
+    <fieldset class="roofline_points">
+      <legend>Code points</legend>
+      <div class="roofline_point_select_div">
+        <select name="roofline_point" class="roofline_point_select">
+          <option value="" selected="selected" disabled="disabled">
+            Select...
+          </option>
+        </select>
+        <!-- This SVG is from Google Material Icons, originally licensed under
+           Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+           (covered by GNU GPL v3 here) -->
+        <svg class="roofline_point_delete" xmlns="http://www.w3.org/2000/svg"
+             height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000">
+           <title>Delete point</title>
+           <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/>
+        </svg>
+      </div>
+      <div class="roofline_point_details">
+        <b>A: </b><span class="roofline_point_ai"><i>Select first.</i></span><br />
+        <b>P: </b><span class="roofline_point_perf"><i>Select first.</i></span>
+      </div>
+    </fieldset>
     <fieldset class="roofline_details">
       <legend>Details</legend>
-      <span class="roofline_details_text">
+      <div class="roofline_details_text">
         <i>Please select a roofline type first.</i>
-      </span>
+      </div>
+      <div>
+        <i>The x-axis is A: arithmetic intensity (flop per byte). The y-axis is P: performance (Gflop per second).</i>
+      </div>
     </fieldset>
   </div>
   <div class="roofline">
@@ -222,7 +250,8 @@ function createWindowDOM(type, timeline_group_id) {
         'data': {},
         'being_resized': false,
         'collapsed': false,
-        'last_focus': Date.now()
+        'last_focus': Date.now(),
+        'session': $('#results_combobox').val()
     };
 
     root.attr('id', new_window_id);
@@ -242,11 +271,49 @@ function createWindowDOM(type, timeline_group_id) {
     return root;
 }
 
+function createMenuDOM(options) {
+    var elem = $('<div id="custom_menu" class="menu_block"></div>');
+    var first = true;
+
+    for (const [k, v] of options) {
+        var item = $('<div></div>');
+
+        if (first) {
+            item.attr('class', 'menu_item_first');
+            first = false;
+        } else {
+            item.attr('class', 'menu_item');
+        }
+
+        item.on('click', {
+            'data': v[0],
+            'handler': v[1]
+        }, function(event) {
+            onCustomMenuItemClick(event, event.data.handler);
+        });
+
+        item.text(k);
+        elem.append(item);
+    }
+
+    return elem;
+}
+
+function onCustomMenuItemClick(event, handler) {
+    closeAllMenus(event, true);
+
+    if (handler !== undefined) {
+        handler(event);
+    }
+}
+
 var current_focused_window_id = undefined;
 var largest_z_index = 0;
 
-function getSymbolFromMap(addr, map_name) {
-    var session = session_dict[$('#results_combobox').val()];
+function getSymbolFromMap(addr, map_name, window_id) {
+    var session = session_dict[window_id === undefined ?
+                               $('#results_combobox').val() :
+                               window_dict[window_id].session];
     if ([addr, map_name] in session.perf_maps_cache) {
         return session.perf_maps_cache[[addr, map_name]];
     }
@@ -312,7 +379,8 @@ $(document).on('change', '#results_combobox', function() {
                                        warning_dict, overall_end_time,
                                        general_metrics_dict,
                                        sampled_diff_dict,
-                                       src_dict, src_index_dict) {
+                                       src_dict, src_index_dict,
+                                       roofline_info) {
                 var item = {
                     id: json.id,
                     group: json.id,
@@ -399,6 +467,10 @@ $(document).on('change', '#results_combobox', function() {
                     Object.assign(src_index_dict, json.src_index);
                 }
 
+                if ('roofline' in json && $.isEmptyObject(roofline_info)) {
+                    Object.assign(roofline_info, json.roofline);
+                }
+
                 if (level > 0) {
                     callchain_dict[item.id] = json.start_callchain;
                 }
@@ -442,7 +514,8 @@ $(document).on('change', '#results_combobox', function() {
                                       general_metrics_dict,
                                       sampled_diff_dict,
                                       src_dict,
-                                      src_index_dict);
+                                      src_index_dict,
+                                      roofline_info);
                 }
             }
 
@@ -482,6 +555,8 @@ $(document).on('change', '#results_combobox', function() {
                     session_dict[value].src_index_dict = {};
                     session_dict[value].overall_end_time = [0];
                     session_dict[value].src_cache = {};
+                    session_dict[value].roofline_dict = {};
+                    session_dict[value].roofline_info = {};
 
                     from_json_to_item(JSON.parse(result), 0,
                                       session_dict[value].item_list,
@@ -495,7 +570,8 @@ $(document).on('change', '#results_combobox', function() {
                                       session_dict[value].general_metrics_dict,
                                       session_dict[value].sampled_diff_dict,
                                       session_dict[value].src_dict,
-                                      session_dict[value].src_index_dict);
+                                      session_dict[value].src_index_dict,
+                                      session_dict[value].roofline_info);
                 }
 
                 var container = $('#block')[0];
@@ -577,7 +653,7 @@ $(document).on('change', '#results_combobox', function() {
                                                     data[event.data.file] = {}
                                                     data[event.data.file][
                                                         event.data.line] = 'exact';
-                                                    closeAllMenus();
+                                                    closeAllMenus(undefined, true);
                                                     openCode(data, event.data.file);
                                             });
                                         }
@@ -639,6 +715,7 @@ $(document).on('change', '#results_combobox', function() {
                         $('#thread_menu_block').css('left', props.pageX);
                         $('#thread_menu_block').outerHeight('auto');
                         $('#thread_menu_block').css('display', 'flex');
+                        $('#thread_menu_block').css('z-index', '10001');
 
                         if (sampled_diff_dict[props.group] >
                             1.0 * parseFloat($('#runtime_diff_threshold_input').val()) / 100) {
@@ -669,7 +746,7 @@ $(document).on('change', '#results_combobox', function() {
                         props.event.preventDefault();
                         props.event.stopPropagation();
 
-                        closeAllMenus(props.event, 'thread_menu_block');
+                        closeAllMenus(props.event, false, 'thread_menu_block');
                     }
                 });
             }
@@ -706,11 +783,6 @@ $(document).on('change', '#results_combobox', function() {
             });
     });
 });
-
-function closeAllMenus() {
-    $('#thread_menu_block').hide();
-    $('#general_analysis_menu_block').hide();
-}
 
 function setupWindow(window_obj, type, data) {
     var loading_jquery = $('#loading').clone();
@@ -838,6 +910,12 @@ function setupWindow(window_obj, type, data) {
         window_obj.find('.roofline_fp').attr(
             'onclick', 'onRooflineBoundsChange(\'fp\', \'' +
                 window_obj.attr('id') + '\')');
+        window_obj.find('.roofline_point_delete').attr(
+            'onclick', 'onRooflinePointDeleteClick(event, ' +
+                '\'' + window_obj.attr('id') + '\')');
+        window_obj.find('.roofline_point_select').attr(
+            'onchange', 'onRooflinePointChange(event, ' +
+                '\'' + window_obj.attr('id') + '\')');
 
         if (type in session.result_cache) {
             window_dict[window_obj.attr('id')].data =
@@ -994,7 +1072,7 @@ function openCode(data, default_path) {
 }
 
 function onCodeFileChange(window_id, event) {
-    var session = session_dict[$('#results_combobox').val()];
+    var session = session_dict[window_dict[window_id].session];
     var path = event.currentTarget.value;
     var load = function(code) {
         var window_obj = $('#' + window_id);
@@ -1020,9 +1098,17 @@ function onCodeFileChange(window_id, event) {
 }
 
 function openRooflinePlot(window_obj, roofline_obj) {
+    var session = session_dict[
+        window_dict[window_obj.attr('id')].session];
+
     for (var i = 0; i < roofline_obj.models.length; i++) {
         window_obj.find('.roofline_type_select').append(
             new Option(roofline_obj.models[i].isa, i));
+    }
+
+    for (const k of Object.keys(session.roofline_dict)) {
+        window_obj.find('.roofline_point_select').append(
+            new Option(k, k));
     }
 
     var plot_container = window_obj.find('.roofline');
@@ -1040,12 +1126,50 @@ function openRooflinePlot(window_obj, roofline_obj) {
     new ResizeObserver(onWindowResize).observe(window_obj[0]);
 }
 
-function onRooflineBoundsChange(bound, window_id) {
+function onRooflinePointDeleteClick(event, window_id) {
     var window_obj = $('#' + window_id);
-    var plot_present = window_obj.find('.roofline_type_select').val() != null;
-    var roofline_obj = window_dict[window_id].data;
-    roofline_obj.bounds[bound] = !roofline_obj.bounds[bound];
+    var cur_val = window_obj.find('.roofline_point_select').val();
 
+    if (cur_val !== '' && cur_val != undefined) {
+        var confirmed = window.confirm('Are you sure you want to ' +
+                                       'delete ' + cur_val + '? ' +
+                                       'Click OK to confirm.');
+
+        if (!confirmed) {
+            return;
+        }
+
+        window_obj.find('.roofline_point_select').val('');
+        window_obj.find('.roofline_point_ai').html('<i>Select first.</i>');
+        window_obj.find('.roofline_point_perf').html('<i>Select first.</i>');
+        window_obj.find(
+            '.roofline_point_select option[value="' + cur_val + '"]').remove()
+
+        var session = session_dict[window_dict[window_id].session];
+        delete session.roofline_dict[cur_val];
+
+        updateRoofline(window_obj, window_dict[window_id].data);
+    }
+}
+
+function onRooflinePointChange(event, window_id) {
+    var window_obj = $('#' + window_id);
+    var new_val = event.target.value;
+
+    if (new_val === '' || new_val == undefined) {
+        window_obj.find('.roofline_point_ai').html('<i>Select first.</i>');
+        window_obj.find('.roofline_point_perf').html('<i>Select first.</i>');
+    } else {
+        var session = session_dict[window_dict[window_id].session];
+        var point = session.roofline_dict[new_val];
+
+        window_obj.find('.roofline_point_ai').text(point[0]);
+        window_obj.find('.roofline_point_perf').text(point[1] / 1000000000);
+    }
+}
+
+function updateRoofline(window_obj, roofline_obj) {
+    var plot_present = window_obj.find('.roofline_type_select').val() != null;
     var model = plot_present ?
         roofline_obj.models[
             window_obj.find('.roofline_type_select').val()] : undefined;
@@ -1108,10 +1232,54 @@ function onRooflineBoundsChange(bound, window_id) {
 
     if (plot_present) {
         var turning_x = model.fp_fma.gflops / Math.min(...for_turning_x);
+
+        var max_point_x = 0;
+        var max_point_y = 0;
+
+        var session = session_dict[window_dict[window_obj.attr('id')].session];
+
+        for (const [name, [x, y]] of Object.entries(session.roofline_dict)) {
+            var scaled_y = y / 1000000000;
+
+            plot_data.push({
+                points: [[x, scaled_y]],
+                fnType: 'points',
+                graphType: 'scatter',
+                color: 'black'
+            })
+
+            plot_data.push({
+                graphType: 'text',
+                location: [x, scaled_y],
+                text: name,
+                color: 'black'
+            })
+
+            if (x > max_point_x) {
+                max_point_x = x;
+            }
+
+            if (scaled_y > max_point_y) {
+                max_point_y = scaled_y;
+            }
+        }
+
         roofline_obj.plot_config.data = plot_data;
-        roofline_obj.plot_config.xAxis.domain = [0, 1.5 * turning_x];
+        roofline_obj.plot_config.xAxis.domain =
+            [0, turning_x > max_point_x ? 1.5 * turning_x : 1.1 * max_point_x];
+        roofline_obj.plot_config.yAxis.domain =
+            [0, model.fp_fma.gflops > max_point_y ?
+             1.25 * model.fp_fma.gflops : 1.1 * max_point_y];
         functionPlot(roofline_obj.plot_config);
     }
+}
+
+function onRooflineBoundsChange(bound, window_id) {
+    var window_obj = $('#' + window_id);
+    var roofline_obj = window_dict[window_id].data;
+    roofline_obj.bounds[bound] = !roofline_obj.bounds[bound];
+
+    updateRoofline(window_obj, roofline_obj);
 }
 
 function onRooflineTypeChange(event, window_id) {
@@ -1119,6 +1287,7 @@ function onRooflineTypeChange(event, window_id) {
     var type_index = event.currentTarget.value;
     var roofline_obj = window_dict[window_id].data;
     var model = roofline_obj.models[type_index];
+    var session = session_dict[window_dict[window_id].session];
 
     window_obj.find('.roofline_details_text').html(`
         <b>Precision:</b> ${model.precision}<br />
@@ -1186,6 +1355,35 @@ function onRooflineTypeChange(event, window_id) {
         plot_data.push(roofline_obj.fp_func);
     }
 
+    var max_point_x = 0;
+    var max_point_y = 0;
+
+    for (const [name, [x, y]] of Object.entries(session.roofline_dict)) {
+        var scaled_y = y / 1000000000;
+
+        plot_data.push({
+            points: [[x, scaled_y]],
+            fnType: 'points',
+            graphType: 'scatter',
+            color: 'black'
+        })
+
+        plot_data.push({
+            graphType: 'text',
+            location: [x, scaled_y],
+            text: name,
+            color: 'black'
+        })
+
+        if (x > max_point_x) {
+            max_point_x = x;
+        }
+
+        if (scaled_y > max_point_y) {
+            max_point_y = scaled_y;
+        }
+    }
+
     var turning_x = model.fp_fma.gflops / Math.min(...for_turning_x);
 
     var container = window_obj.find('.roofline');
@@ -1195,12 +1393,13 @@ function onRooflineTypeChange(event, window_id) {
         width: container.width() - 10,
         height: container.height() - 10,
         xAxis: {
-            label: 'Arithmetic intensity (flop/byte)',
-            domain: [0.00390625, 1.5 * turning_x]
+            domain: [0.00390625, turning_x > max_point_x ?
+                     1.5 * turning_x : 1.1 * max_point_x]
         },
         yAxis: {
-            label: 'Performance (Gflop/s)',
-            domain: [0, 1.25 * model.fp_fma.gflops]
+            domain: [0, model.fp_fma.gflops > max_point_y ?
+                     1.25 * model.fp_fma.gflops :
+                     1.1 * max_point_y]
         },
         disableZoom: true,
         data: plot_data
@@ -1210,8 +1409,7 @@ function onRooflineTypeChange(event, window_id) {
 }
 
 function onMenuItemClick(event, analysis_type, timeline_group_id) {
-    $('#thread_menu_block').hide();
-    $('#general_analysis_menu_block').hide();
+    closeAllMenus(event, true);
 
     var new_window = createWindowDOM(analysis_type, timeline_group_id);
     new_window.css('top', event.pageY + 'px');
@@ -1347,6 +1545,191 @@ function updateFlameGraph(window_id, data, always_change_height) {
     }
 }
 
+function onOpenCodeClick(event) {
+    var data = event.data.data;
+    var node = data.node;
+    var offset_dict = data.offset_dict;
+    var sums = {};
+
+    for (const [addr, val] of Object.entries(node.data.offsets)) {
+        var decoded = offset_dict[addr];
+
+        if (decoded === undefined) {
+            continue;
+        }
+
+        if (!(decoded.file in sums)) {
+            sums[decoded['file']] = {};
+        }
+
+        if (!(decoded.line in sums[decoded.file])) {
+            if (node.data.cold) {
+                sums[decoded.file][decoded.line] = [170, 170, 255, 0, 0, 'unit(s)'];
+            } else {
+                sums[decoded.file][decoded.line] = [255, 0, 0, 0, 0, 'unit(s)'];
+            }
+        }
+
+        sums[decoded.file][decoded.line][3] += (val / node.data.value);
+        sums[decoded.file][decoded.line][4] += val;
+    }
+
+    openCode(sums, Object.keys(sums)[0]);
+}
+
+function onAddToRooflineClick(event) {
+    var window_id = event.data.data.window_id;
+    var session = session_dict[window_dict[window_id].session];
+    var info = session.roofline_info;
+    var result_obj = window_dict[window_id].data.result_obj;
+    var window_obj = $('#' + window_id);
+    var exists = false;
+
+    do {
+        var name = window.prompt((exists ? 'This name already exists!\n\n' : '') +
+            'What name do you want to give to your new roofline point?');
+
+        if (name == undefined || name === "") {
+            return;
+        }
+
+        exists = name in session.roofline_dict;
+    } while (exists);
+
+    var trace = [];
+    var node = event.data.data.node;
+    var cur_callchain_obj = session.callchain_obj[window_obj.find('.flamegraph_metric').val()];
+
+    while (node != undefined) {
+        if (node.data.name in cur_callchain_obj) {
+            trace.push(cur_callchain_obj[node.data.name]);
+        } else {
+            trace.push(node.data.name);
+        }
+        node = node.parent;
+    }
+
+    var ai_keys = info.ai_keys;
+    var instr_keys = info.instr_keys;
+
+    var ai_nodes = [];
+    var instr_nodes = [];
+
+    for (const k of ai_keys) {
+        if (result_obj[k] === undefined) {
+            ai_nodes.push([undefined]);
+        } else {
+            ai_nodes.push([result_obj[k][0],
+                           session.callchain_obj[k]]);
+        }
+    }
+
+    for (const k of instr_keys) {
+        if (result_obj[k] === undefined) {
+            instr_nodes.push([undefined]);
+        } else {
+            instr_nodes.push([result_obj[k][0],
+                              session.callchain_obj[k]]);
+        }
+    }
+
+    var iterate = function(arr, req_name) {
+        for (var i = 0; i < arr.length; i++) {
+            if (arr[i][0] === undefined) {
+                continue;
+            }
+
+            var found = false;
+            for (const child of arr[i][0].children) {
+                if ((typeof arr[i][1][child.name]) !== (typeof req_name)) {
+                    continue;
+                }
+
+                if (((typeof req_name) === 'string' && arr[i][1][child.name] === req_name) ||
+                    ((typeof req_name) === 'object' && arr[i][1][child.name].length === 2 &&
+                     req_name.length === 2 && arr[i][1][child.name][0] === req_name[0] &&
+                     arr[i][1][child.name][1] === req_name[1])) {
+                    arr[i][0] = child;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                arr[i][0] = undefined;
+            }
+        }
+    };
+
+    for (var i = trace.length - 2; i >= 0; i--) {
+        iterate(ai_nodes, trace[i]);
+        iterate(instr_nodes, trace[i]);
+    }
+
+    var zeroed_instr_nodes = 0;
+    var zeroed_ai_nodes = 0;
+
+    for (var i = 0; i < instr_nodes.length; i++) {
+        if (instr_nodes[i][0] === undefined) {
+            instr_nodes[i] = 0;
+            zeroed_instr_nodes++;
+        } else {
+            instr_nodes[i] = instr_nodes[i][0].value;
+        }
+    }
+
+    for (var i = 0; i < ai_nodes.length; i++) {
+        if (ai_nodes[i][0] === undefined) {
+            ai_nodes[i] = 0;
+            zeroed_ai_nodes++;
+        } else {
+            ai_nodes[i] = ai_nodes[i][0].value;
+        }
+    }
+
+    if (zeroed_ai_nodes === ai_nodes.length ||
+        zeroed_instr_nodes === instr_nodes.length) {
+        window.alert('There is insufficient roofline information ' +
+                     'for the requested code block!');
+        return;
+    }
+
+    var flops = undefined;
+    var arith_intensity = undefined;
+
+    if (info.cpu_type === 'Intel_x86') {
+        flops = instr_nodes[0] + instr_nodes[1] + 4 * instr_nodes[2] +
+            2 * instr_nodes[3] + 8 * instr_nodes[4] + 4 * instr_nodes[5] +
+            16 * instr_nodes[6] + 8 * instr_nodes[7];
+
+        var instr_sum = instr_nodes[0] + instr_nodes[1] + instr_nodes[2] +
+            instr_nodes[3] + instr_nodes[4] + instr_nodes[5] + instr_nodes[6] +
+            instr_nodes[7];
+
+        var single_ratio =
+            (instr_nodes[0] + instr_nodes[2] +
+             instr_nodes[4] + instr_nodes[6]) / instr_sum;
+        var double_ratio =
+            (instr_nodes[1] + instr_nodes[3] +
+             instr_nodes[5] + instr_nodes[7]) / instr_sum;
+
+        arith_intensity = flops / (ai_nodes[0] * (4 * single_ratio +
+                                                  8 * double_ratio));
+    }
+
+    session.roofline_dict[name] = [arith_intensity, flops];
+
+    for (const [k, v] of Object.entries(window_dict)) {
+        if (v.type === 'roofline' &&
+            v.session === window_dict[window_id].session) {
+            var window_obj = $('#' + k);
+            window_obj.find('.roofline_point_select').append(
+                new Option(name, name));
+            updateRoofline(window_obj, v.data);
+        }
+    }
+}
+
 function openFlameGraph(window_id, metric) {
     var window_obj = $('#' + window_id);
     var result_obj = window_dict[window_id].data.result_obj;
@@ -1366,10 +1749,10 @@ function openFlameGraph(window_id, metric) {
         }
     });
     flamegraph_obj.getName(function(node) {
-        var session = session_dict[$('#results_combobox').val()];
+        var session = session_dict[window_dict[window_id].session];
         if (node.data.name in session.callchain_obj[window_obj.find('.flamegraph_metric').val()]) {
             var symbol = session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
-            return String(getSymbolFromMap(symbol[0], symbol[1]));
+            return String(getSymbolFromMap(symbol[0], symbol[1], window_id));
         } else {
             return String(node.data.name);
         }
@@ -1394,46 +1777,67 @@ function openFlameGraph(window_id, metric) {
             updateFlameGraph(window_id, d3.select('#' + window_obj.find('.flamegraph_svg').attr('id')).datum().data, false);
         }
     });
-    flamegraph_obj.onContextMenu(function(node) {
-        var session = session_dict[$('#results_combobox').val()];
-        var symbol = session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
-        var offset_dict = session.src_dict[symbol[1]];
+    flamegraph_obj.onContextMenu(function(event, node) {
+        closeAllMenus(event, false);
 
-        if (offset_dict === undefined) {
-            return;
+        var options = [];
+        var session = session_dict[window_dict[window_id].session];
+
+        if (!window_obj.find('.flamegraph_time_ordered').prop('checked') &&
+            'roofline' in session.general_metrics_dict) {
+            options.push(['Add to the roofline plot', [{
+                'node': node,
+                'window_id': window_id
+            }, onAddToRooflineClick]]);
         }
 
-        var sums = {};
-        var added = false;
+        var symbol = session.callchain_obj[window_obj.find('.flamegraph_metric').val()][node.data.name];
 
-        for (const [addr, val] of Object.entries(node.data.offsets)) {
-            var decoded = offset_dict[addr];
+        if (symbol !== undefined && session.src_dict[symbol[1]] !== undefined) {
+            var offset_dict = session.src_dict[symbol[1]];
+            var code_available = false;
 
-            if (decoded === undefined) {
-                continue;
-            }
+            for (const addr of Object.keys(node.data.offsets)) {
+                var decoded = offset_dict[addr];
 
-            added = true;
-
-            if (!(decoded.file in sums)) {
-                sums[decoded['file']] = {};
-            }
-
-            if (!(decoded.line in sums[decoded.file])) {
-                if (node.data.cold) {
-                    sums[decoded.file][decoded.line] = [170, 170, 255, 0, 0, 'unit(s)'];
-                } else {
-                    sums[decoded.file][decoded.line] = [255, 0, 0, 0, 0, 'unit(s)'];
+                if (decoded !== undefined) {
+                    code_available = true;
+                    break;
                 }
             }
 
-            sums[decoded.file][decoded.line][3] += (val / node.data.value);
-            sums[decoded.file][decoded.line][4] += val;
+            if (code_available) {
+                options.push(['View the code details', [{
+                    'offset_dict': offset_dict,
+                    'node': node
+                }, onOpenCodeClick]]);
+            }
         }
 
-        if (added) {
-            openCode(sums, Object.keys(sums)[0]);
+        if (options.length === 0) {
+            return;
         }
+
+        var menu = createMenuDOM(options);
+
+        menu.css('top', event.pageY);
+        menu.css('left', event.pageX);
+        menu.outerHeight('auto');
+        menu.css('display', 'flex');
+        menu.css('z-index', '10001');
+
+        var height = menu.outerHeight();
+        var width = menu.outerWidth();
+
+        if (event.pageY + height > $(window).outerHeight() - 30) {
+            menu.outerHeight($(window).outerHeight() - event.pageY - 30);
+        }
+
+        if (event.pageX + width > $(window).outerWidth() - 20) {
+            menu.css('left', event.pageX - width);
+        }
+
+        $('body').append(menu);
     });
     flamegraph_obj.setLabelHandler(function(node) {
         var numf = new Intl.NumberFormat('en-US');
@@ -1476,23 +1880,29 @@ function openFlameGraph(window_id, metric) {
     window_obj.find('.flamegraph')[0].scrollTop = 0;
 }
 
-function closeAllMenus(event, exclude) {
+function closeAllMenus(event, include_target, exclude) {
     if (exclude !== 'thread_menu_block' &&
-        (event === undefined ||
+        (event === undefined || include_target ||
          !document.getElementById('thread_menu_block').contains(event.target))) {
         $('#thread_menu_block').hide();
     }
 
     if (exclude !== 'settings_block' &&
-        (event === undefined ||
+        (event === undefined || include_target ||
          !document.getElementById('settings_block').contains(event.target))) {
         $('#settings_block').hide();
     }
 
     if (exclude !== 'general_analysis_menu_block' &&
-        (event === undefined ||
+        (event === undefined || include_target ||
          !document.getElementById('general_analysis_menu_block').contains(event.target))) {
         $('#general_analysis_menu_block').hide();
+    }
+
+    if (exclude !== 'custom_menu' && document.getElementById('custom_menu') != undefined &&
+        (event === undefined || include_target ||
+         !document.getElementById('custom_menu').contains(event.target))) {
+        $('#custom_menu').remove();
     }
 }
 
@@ -1562,7 +1972,8 @@ function onWindowMouseUp(window_id) {
             flamegraph_obj.width(window_obj.find('.flamegraph_svg').outerWidth());
             flamegraph_obj.update();
         } else if (window_dict[window_id].type === 'roofline' &&
-                   window_dict[window_id].data.plot_config !== undefined) {
+                   window_dict[window_id].data.plot_config !== undefined &&
+                   window_obj.find('.roofline_type_select').val() != null) {
             window_obj.find('.roofline').html('');
 
             var plot_config = window_dict[window_id].data.plot_config;
@@ -1615,7 +2026,7 @@ function downloadFlameGraph(window_id) {
         'What filename do you want? ' +
             '(".png" will be added automatically)');
 
-    if (filename === null || filename === "") {
+    if (filename == undefined || filename === "") {
         return;
     }
 
@@ -1717,6 +2128,7 @@ function startDrag(event, window_id) {
 function onSettingsClick(event) {
     $('#settings_block').css('top', event.clientY);
     $('#settings_block').css('left', event.clientX);
+    $('#settings_block').css('z-index', '10001');
     $('#settings_block').show();
 
     var height = $('#settings_block').outerHeight();
@@ -1735,7 +2147,7 @@ function onSettingsClick(event) {
     event.preventDefault();
     event.stopPropagation();
 
-    closeAllMenus(event, 'settings_block');
+    closeAllMenus(event, false, 'settings_block');
 }
 
 function onGeneralAnalysesClick(event) {
@@ -1754,9 +2166,10 @@ function onGeneralAnalysesClick(event) {
     $('#general_analysis_menu_block').css('left', event.clientX);
     $('#general_analysis_menu_block').outerHeight('auto');
     $('#general_analysis_menu_block').css('display', 'flex');
+    $('#general_analysis_menu_block').css('z-index', '10001');
 
     event.preventDefault();
     event.stopPropagation();
 
-    closeAllMenus(event, 'general_analysis_menu_block');
+    closeAllMenus(event, false, 'general_analysis_menu_block');
 }
