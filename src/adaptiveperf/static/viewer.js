@@ -1635,6 +1635,9 @@ function onAddToRooflineClick(event) {
         }
     }
 
+    var walltime_node = [[result_obj['walltime'][0],
+                          session.callchain_obj['walltime']]];
+
     var iterate = function(arr, req_name) {
         for (var i = 0; i < arr.length; i++) {
             if (arr[i][0] === undefined) {
@@ -1666,6 +1669,7 @@ function onAddToRooflineClick(event) {
     for (var i = trace.length - 2; i >= 0; i--) {
         iterate(ai_nodes, trace[i]);
         iterate(instr_nodes, trace[i]);
+        iterate(walltime_node, trace[i]);
     }
 
     var zeroed_instr_nodes = 0;
@@ -1689,20 +1693,24 @@ function onAddToRooflineClick(event) {
         }
     }
 
-    if (zeroed_ai_nodes === ai_nodes.length ||
+
+    if (walltime_node[0][0] === undefined ||
+        zeroed_ai_nodes === ai_nodes.length ||
         zeroed_instr_nodes === instr_nodes.length) {
         window.alert('There is insufficient roofline information ' +
                      'for the requested code block!');
         return;
     }
 
+    var flop = undefined;
     var flops = undefined;
     var arith_intensity = undefined;
 
     if (info.cpu_type === 'Intel_x86') {
-        flops = instr_nodes[0] + instr_nodes[1] + 4 * instr_nodes[2] +
+        flop = instr_nodes[0] + instr_nodes[1] + 4 * instr_nodes[2] +
             2 * instr_nodes[3] + 8 * instr_nodes[4] + 4 * instr_nodes[5] +
             16 * instr_nodes[6] + 8 * instr_nodes[7];
+        flops = flop / (walltime_node[0][0].value / 1000000000);
 
         var instr_sum = instr_nodes[0] + instr_nodes[1] + instr_nodes[2] +
             instr_nodes[3] + instr_nodes[4] + instr_nodes[5] + instr_nodes[6] +
@@ -1714,9 +1722,18 @@ function onAddToRooflineClick(event) {
         var double_ratio =
             (instr_nodes[1] + instr_nodes[3] +
              instr_nodes[5] + instr_nodes[7]) / instr_sum;
+        arith_intensity = flop / (ai_nodes[0] * (4 * single_ratio +
+                                                 8 * double_ratio));
 
-        arith_intensity = flops / (ai_nodes[0] * (4 * single_ratio +
-                                                  8 * double_ratio));
+        // var single_scalar_ratio = instr_nodes[0] / instr_sum;
+        // var double_scalar_ratio = instr_nodes[1] / instr_sum;
+        // var sse_ratio = (instr_nodes[2] + instr_nodes[3]) / instr_sum;
+        // var avx2_ratio = (instr_nodes[4] + instr_nodes[5]) / instr_sum;
+        // var avx512_ratio = (instr_nodes[6] + instr_nodes[7]) / instr_sum;
+
+        // arith_intensity = flop / (ai_nodes[0] * (
+        //     4 * single_scalar_ratio + 8 * double_scalar_ratio +
+        //         16 * sse_ratio + 32 * avx2_ratio + 64 * avx512_ratio))
     }
 
     session.roofline_dict[name] = [arith_intensity, flops];
