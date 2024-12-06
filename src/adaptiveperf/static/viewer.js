@@ -1266,9 +1266,9 @@ function updateRoofline(window_obj, roofline_obj) {
 
         roofline_obj.plot_config.data = plot_data;
         roofline_obj.plot_config.xAxis.domain =
-            [0, turning_x > max_point_x ? 1.5 * turning_x : 1.1 * max_point_x];
+            [0.00390625, turning_x > max_point_x ? 1.5 * turning_x : 1.1 * max_point_x];
         roofline_obj.plot_config.yAxis.domain =
-            [0, model.fp_fma.gflops > max_point_y ?
+            [0.00390625, model.fp_fma.gflops > max_point_y ?
              1.25 * model.fp_fma.gflops : 1.1 * max_point_y];
         functionPlot(roofline_obj.plot_config);
     }
@@ -1393,11 +1393,13 @@ function onRooflineTypeChange(event, window_id) {
         width: container.width() - 10,
         height: container.height() - 10,
         xAxis: {
+            type: 'log',
             domain: [0.00390625, turning_x > max_point_x ?
                      1.5 * turning_x : 1.1 * max_point_x]
         },
         yAxis: {
-            domain: [0, model.fp_fma.gflops > max_point_y ?
+            type: 'log',
+            domain: [0.00390625, model.fp_fma.gflops > max_point_y ?
                      1.25 * model.fp_fma.gflops :
                      1.1 * max_point_y]
         },
