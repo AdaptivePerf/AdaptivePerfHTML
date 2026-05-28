@@ -112,7 +112,7 @@ class Identifier:
         if self._second is not None:
             return int(self._second)
 
-        return None
+        return []
 
     @property
     def value(self):
@@ -121,6 +121,10 @@ class Identifier:
     @property
     def path(self):
         return self._path
+
+    @property
+    def raw_name(self):
+        return self._path.name
 
     def __eq__(self, other):
         return self.value == other.value
@@ -134,78 +138,146 @@ class Module(ABC):
     def get_name(self):
         pass
 
+    def set_version_used(self, ver_code: list[int]):
+        self._version_used = ver_code
 
-class Window(ABC):
-    _ids = set()
+    def get_version_used(self) -> list[int]:
+        if hasattr(self, '_version_used'):
+            return self._version_used
 
-    def get_arrgmt(windows: Union[Self, list[Self]]):
-        pass
+        return None
 
-    @abstractmethod
-    def get_module(self) -> Module:
-        pass
 
-    @abstractmethod
-    def get_type(self) -> str:
-        pass
-
-    @abstractmethod
-    def get_constr_params(self) -> list:
-        pass
-
-    @abstractmethod
-    def get_dependencies(self) -> list[Self]:
-        pass
-
-    @abstractmethod
-    def get_data(self):
-        pass
-
-    def get_id(self):
-        pass
-
-    def set_custom_title(self, title: str):
-        self._custom_title = title
-
-    def get_custom_title(self):
-        if hasattr(self, '_custom_title'):
-            return self._custom_title
-        else:
-            return None
-
-    def is_collapsed(self):
-        if hasattr(self, '_collapsed') and \
-           self._collapsed is not None:
-            return self._collapsed
-        else:
-            return False
-
-    def set_collapsed(self, collapsed: bool):
-        self._collapsed = collapsed
-
-    def to_json(self, identifier: str) -> str:
-        to_return = {
-            'id': identifier,
-            'type': self.get_type(),
-            'constr': self.get_constr_params(),
-            'dependencies': [],
-            'collapsed': self.is_collapsed()
+class Analysable:
+    def __init__(self, name: str, modules: list[Module]):
+        self._name = name
+        self._modules = {
+            m.name: m for m in modules
         }
 
-        module = self.get_module()
-        custom_title = self.get_custom_title()
-        data = self.get_data()
+    @property
+    def name(self):
+        return self._name
 
-        if module is not None:
-            to_return['module'] = module.get_name()
+    def get_module(self, name: str) -> Module:
+        return self._modules.get(name, None)
 
-        if custom_title is not None:
-            to_return['custom_title'] = custom_title
+    def get_modules_iterable(self):
+        return self._modules.values()
 
-        if data is not None:
-            to_return['data'] = data
+    def __hash__(self):
+        return hash(self._name)
 
-        return json.dumps(to_return)
+
+class Edge(Analysable):
+    def __init__(self, start, end, name: str, modules: list[Module] = []):
+        super(name, modules)
+        self._start = start
+        self._end = end
+
+    @property
+    def start(self):
+        return self._start
+
+    @property
+    def end(self):
+        return self._end
+
+    def get_export_name(self):
+        if self.start.entity == self.end.entity:
+            return f'{self.start.entity.name}_{self.name}'
+        else:
+            return self.name
+
+
+class Node(Analysable):
+    def __init__(self, name: str, entity, modules: list[Module] = []):
+        super(name, modules)
+        self._out_edges = {}
+        self._entity = entity
+
+    def add_out_edge(self, edge: Edge):
+        if edge.name in self._out_edges:
+            raise ValueError(f'Edge "{edge.name}" already exists!')
+
+        self._out_edges[edge.name] = edge
+
+    def remove_out_edge(self, name: str) -> bool:
+        if name in self._out_edges:
+            del self._out_edges[name]
+            return True
+
+        return False
+
+    def get_out_edge(self, name: str) -> Edge:
+        return self._out_edges.get(name, None)
+
+    def get_out_edges_iterable(self):
+        return self._out_edges.values()
+
+    @property
+    def entity(self):
+        return self._entity
+
+    def get_export_name(self):
+        return f'{self.entity.name}_{self.name}'
+
+
+class Entity:
+    _used_colours = set()
+
+    def __init__(self, name: str, exit_code: int):
+        self._name = name
+        self._exit_code = exit_code
+        self._nodes = {}
+
+        # TODO: Move entity colour assigning to Adaptyst itself or
+        # remove it altogether
+        colour = (random.randrange(100, 181, 10),
+                  random.randrange(100, 181, 10),
+                  random.randrange(100, 181, 10))
+
+        while colour in Entity._used_colours:
+            colour = (random.randrange(100, 181, 10),
+                      random.randrange(100, 181, 10),
+                      random.randrange(100, 181, 10))
+
+        Entity._used_colours.add(colour)
+        self._colour = colour
+
+    def add_node(self, node: Node):
+        if node.name in self._nodes:
+            raise ValueError(f'Node "{node.name}" already exists')
+
+        self._nodes[node.name] = node
+
+    def remove_node(self, name: str) -> bool:
+        if name in self._nodes:
+            del self._nodes[name]
+            return True
+
+        return False
+
+    def get_node(self, name: str) -> Node:
+        return self._nodes.get(name, None)
+
+    def get_nodes_iterable(self):
+        return self._nodes.values()
+
+    def get_hex_colour(self):
+        colour = self._colour
+        return f'#{colour[0]:02x}{colour[1]:02x}{colour[2]:02x}'
+
+    @property
+    def exit_code(self):
+        return self._exit_code
+
+    @property
+    def name(self):
+        return self._name
+
+    def __eq__(self, other):
+        return self.name == other.name
 
 
 class Session:
@@ -288,18 +360,6 @@ class Session:
                     self._used_module_vers[entity_name][node][name] = \
                         mod_meta['version']
 
-        self._entity_colours = {}
-
-        # TODO: Move entity colour assigning to Adaptyst itself or
-        # remove it altogether
-
-        # if (self._identifier.path / 'entity_colours.json').exists():
-        #     with (self._identifier.path /
-        #           'entity_colours.json').open(mode='r') as f:
-        #         self._entity_colours = json.load(f)
-        # else:
-        #     self._entity_colours = {}
-
         self._entity_exit_codes = {}
 
         for entity_dir in (self._identifier.path / 'system').glob('*'):
@@ -315,46 +375,18 @@ class Session:
             self._entity_exit_codes[entity_dir.name] = \
                 metadata.get('exit_code', -1)
 
-    def _set_entity_colour(self, entity, colour):
-        self._entity_colours[entity] = colour
-
-        # TODO: Move entity colour assigning to Adaptyst itself or
-        # remove it altogether
-
-        # with (self._identifier.path /
-        #       'entity_colours.json').open(mode='w') as f:
-        #     f.write(json.dumps(self._entity_colours))
+    @property
+    def identifier(self):
+        return self._identifier
 
     def get_system_graph_json(self, json_type: str = 'sigma.js'):
-        used_colours = set()
-        entities = {}
-
-        for entity in self._system['entities'].keys():
-            exit_code = self._entity_exit_codes.get(entity, -1)
-            entity = html.escape(entity)
-            entities[entity] = [exit_code, '#808080']
-
-            if entity in self._entity_colours:
-                used_colours.add(self._entity_colours[entity])
-                entities[entity][1] = self._entity_colours[entity]
-            else:
-                colour = (random.randrange(100, 181, 10),
-                          random.randrange(100, 181, 10),
-                          random.randrange(100, 181, 10))
-
-                while colour in used_colours:
-                    colour = (random.randrange(100, 181, 10),
-                              random.randrange(100, 181, 10),
-                              random.randrange(100, 181, 10))
-
-                used_colours.add(colour)
-                entities[entity][1] = \
-                    f'#{colour[0]:02x}{colour[1]:02x}{colour[2]:02x}'
-                self._set_entity_colour(entity, entities[entity][1])
+        entity_metadata = {
+            e.name: [e.exit_code, e.get_hex_colour()] for e in self._entities
+        }
 
         if json_type == 'sigma.js':
             return json.dumps({
-                'entities': entities,
+                'entities': entity_metadata,
                 'system': {
                     'options': {
                         'allowSelfLoops': False,
@@ -363,55 +395,187 @@ class Session:
                     },
                     'nodes': [
                         {
-                            'key': f'{entity}_{k}',
+                            'key': node.get_export_name(),
                             'attributes': {
                                 'x': random.random(),
                                 'y': random.random(),
-                                'label': f'[{entity}] {k}',
-                                'server_id': k,
+                                'label': f'[{entity.name}] {node.name}',
+                                'server_id': node.name,
                                 'size': 40,
-                                'color': entities[html.escape(entity)][1],
-                                'entity': entity,
-                                'backends': [[x['name'],
-                                              self._used_module_vers[
-                                                  entity][k].get(
-                                                      x['name'], [])]
-                                             for x in v['modules']]
+                                'color': entity.get_hex_colour(),
+                                'entity': entity.name,
+                                'backends':
+                                [[x.name, x.get_version_used()]
+                                 for x in node.get_modules_iterable()]
                             }
                         }
-                        for entity in self._system['entities'].keys()
-                        for k, v in self._system['entities'][
-                                entity]['nodes'].items()
+                        for entity in self._entities.values()
+                        for node in entity.get_nodes_iterable()
                     ],
                     'edges': [
                         {
-                            'key': f'{entity}_{k}',
-                            'source': f'{entity}_{v["from"]}',
-                            'target': f'{entity}_{v["to"]}',
+                            'key': edge.get_export_name(),
+                            'source': edge.start.get_export_name(),
+                            'target': edge.end.get_export_name(),
                             'undirected': False,
                             'attributes': {
-                                'label': k,
+                                'label': edge.name,
                                 'size': 10
                             }
                         }
-                        for entity in self._system['entities'].keys()
-                        for k, v in self._system['entities'][
-                                entity].get('edges', {}).items()
-                    ] + [
-                        {
-                            'key': k,
-                            'source': f'{v["from"]["entity"]}' +
-                            f'_{v["from"]["node"]}',
-                            'target': f'{v["to"]["entity"]}_{v["to"]["node"]}',
-                            'undirected': False,
-                            'attributes': {
-                                'label': k,
-                                'size': 10
-                            }
-                        }
-                        for k, v in self._system.get('edges', {}).items()
+                        for entity in self._entities.values()
+                        for node in entity.get_nodes_iterable()
+                        for edge in node.get_out_edges_iterable()
                     ]
                 }
             })
         else:
             raise ValueError('json_type must be one of: "sigma.js"')
+
+
+class Window(ABC):
+    _ids = set()
+
+    def get_arrgmt_json(windows: Union[Self, list[Self]],
+                        session: Session = None):
+        if isinstance(windows, list):
+            if session is None:
+                raise ValueError('"session" must not be None '
+                                 'if "windows" is a list!')
+
+            return json.dumps({
+                'session': session.identifier.raw_name,
+                'windows': {
+                    w.get_id(): w.to_dict() for w in windows
+                }
+            })
+        else:
+            cur_dependencies = set(windows.get_dependencies())
+            all_dependencies = set(cur_dependencies)
+
+            while len(cur_dependencies) > 0:
+                new_dependencies = set()
+
+                for d in cur_dependencies:
+                    for wd in d.get_dependencies():
+                        new_dependencies.add(wd)
+
+                for d in new_dependencies:
+                    all_dependencies.add(d)
+
+                cur_dependencies = new_dependencies
+
+            to_return = {
+                'main_window': windows.to_dict(),
+                'other_windows': {
+                    w.get_id(): w.to_dict() for w in all_dependencies
+                }
+            }
+
+            if session is not None:
+                to_return['session'] = session.identifier.raw_name
+
+            return json.dumps(to_return)
+
+    @abstractmethod
+    def get_module(self) -> Module:
+        pass
+
+    @abstractmethod
+    def get_type(self) -> str:
+        pass
+
+    @abstractmethod
+    def get_constr_params(self) -> list:
+        pass
+
+    @abstractmethod
+    def get_dependencies(self) -> list[Self]:
+        pass
+
+    @abstractmethod
+    def get_data(self):
+        pass
+
+    @abstractmethod
+    def get_session(self) -> Session:
+        pass
+
+    def set_id(self, identifier):
+        if identifier in Window._ids:
+            raise ValueError(f'"{identifier}" is already set '
+                             'for a different Window instance')
+
+        if hasattr(self, '_id'):
+            Window._ids.remove(self._id)
+
+        self._id = identifier
+        Window._ids.add(identifier)
+
+    def get_id(self):
+        if not hasattr(self, '_id'):
+            session = self.get_session()
+            t = self.get_type()
+            index = 0
+
+            if session is None:
+                identifier = f'w_{t}_{index}'
+
+                while identifier in Window._ids:
+                    index += 1
+                    identifier = f'w_{t}_{index}'
+            else:
+                identifier = f'w_{session.identifier.label}_{t}_{index}'
+
+                while identifier in Window._ids:
+                    index += 1
+                    identifier = f'w_{session.identifier.label}_{t}_{index}'
+
+            self._id = identifier
+            Window._ids.add(identifier)
+
+        return self._id
+
+    def set_custom_title(self, title: str):
+        self._custom_title = title
+
+    def get_custom_title(self):
+        if hasattr(self, '_custom_title'):
+            return self._custom_title
+        else:
+            return None
+
+    def is_collapsed(self):
+        if hasattr(self, '_collapsed') and \
+           self._collapsed is not None:
+            return self._collapsed
+        else:
+            return False
+
+    def set_collapsed(self, collapsed: bool):
+        self._collapsed = collapsed
+
+    def to_dict(self):
+        to_return = {
+            'id': self.get_id(),
+            'type': self.get_type(),
+            'constr': self.get_constr_params(),
+            'dependencies': list(map(Window.get_id,
+                                     self.get_dependencies())),
+            'collapsed': self.is_collapsed()
+        }
+
+        module = self.get_module()
+        custom_title = self.get_custom_title()
+        data = self.get_data()
+
+        if module is not None:
+            to_return['module'] = module.get_name()
+
+        if custom_title is not None:
+            to_return['custom_title'] = custom_title
+
+        if data is not None:
+            to_return['data'] = data
+
+        return to_return

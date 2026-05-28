@@ -7,7 +7,7 @@ import json
 from . import arrangements as arrgmts
 from flask import Flask, render_template, request
 from pathlib import Path
-from . import PerformanceAnalysisResults
+from . import Session
 from importlib.metadata import version
 from importlib import import_module
 
@@ -60,10 +60,9 @@ arrgmts.Base.initialize(app.config.get('DATABASE_URL', None),
 @app.get('/<identifier>/')
 def get(identifier):
     try:
-        results = PerformanceAnalysisResults(
-            app.config['PERFORMANCE_ANALYSIS_STORAGE'],
-            identifier)
-        return results.get_system_graph()
+        results = Session(
+            Path(app.config['PERFORMANCE_ANALYSIS_STORAGE']) / identifier)
+        return results.get_system_graph_json()
     except ValueError:
         return '', 404
 
@@ -124,7 +123,7 @@ def main():
     else:
         background = 'gray'
 
-    ids = PerformanceAnalysisResults.get_all_folders(
+    ids = Session.get_all_sessions(
         app.config['PERFORMANCE_ANALYSIS_STORAGE'])
 
     arrgmt = request.values.get('arrgmt', None)
