@@ -4,11 +4,9 @@
 import json
 import yaml
 import random
-import html
 from abc import ABC, abstractmethod
 from typing import Union, Self
 from pathlib import Path
-from collections import defaultdict
 
 
 class Identifier:
@@ -226,10 +224,10 @@ class Node(Analysable):
 class Entity:
     _used_colours = set()
 
-    def __init__(self, name: str, exit_code: int):
+    def __init__(self, name: str):
         self._name = name
-        self._exit_code = exit_code
         self._nodes = {}
+        self._exit_code = -1
 
         # TODO: Move entity colour assigning to Adaptyst itself or
         # remove it altogether
@@ -268,8 +266,10 @@ class Entity:
         colour = self._colour
         return f'#{colour[0]:02x}{colour[1]:02x}{colour[2]:02x}'
 
-    @property
-    def exit_code(self):
+    def set_exit_code(self, exit_code: int):
+        self._exit_code = exit_code
+
+    def get_exit_code(self) -> int:
         return self._exit_code
 
     @property
@@ -335,32 +335,72 @@ class Session:
             raise ValueError('identifier must be of type Identifier, '
                              'pathlib.Path, or str!')
 
+        self._entities = {}
+
         with (self._identifier.path / 'system' /
               'system.yml').open(mode='r') as f:
-            self._system = yaml.safe_load(f)
+            system_yaml = yaml.safe_load(f)
 
-        self._used_module_vers = defaultdict(lambda: defaultdict(dict))
+        def process_mod(module_dict, mod_meta_path_prefix,
+                        module_list):
+            module_obj = None
 
-        for entity_name, entity in self._system['entities'].items():
-            for node, settings in entity['nodes'].items():
-                for mod in settings['modules']:
-                    name = mod['name']
-                    mod_meta_path = self._identifier.path / 'system' / \
-                        entity_name / node / name / 'dirmeta.json'
+            name = module_dict['name']
+            mod_meta_path = mod_meta_path_prefix / name / 'dirmeta.json'
 
-                    if not mod_meta_path.exists():
-                        continue
+            if not mod_meta_path.exists():
+                return
 
-                    with mod_meta_path.open(mode='r') as f:
-                        mod_meta = json.load(f)
+            with mod_meta_path.open(mode='r') as f:
+                mod_meta = json.load(f)
 
-                    if 'version' not in mod_meta:
-                        continue
+            if 'version' not in mod_meta:
+                return
 
-                    self._used_module_vers[entity_name][node][name] = \
-                        mod_meta['version']
+            module_obj.set_version_used(mod_meta['version'])
+            modules.append(module_obj)
 
-        self._entity_exit_codes = {}
+        for entity_name, entity in system_yaml['entities'].items():
+            self._entities[entity_name] = Entity(entity_name)
+            entity_obj = self._entities[entity_name]
+
+            for node, settings in entity.get('nodes', {}).items():
+                modules = []
+
+                for mod in settings.get('modules', []):
+                    process_mod(mod,
+                                self._identifier.path / 'system' /
+                                entity_name / node,
+                                modules)
+
+                entity_obj.add_node(Node(node, entity_obj, modules))
+
+            for edge, settings in entity.get('edges', {}).items():
+                start_obj = entity_obj.get_node(settings['from'])
+                end_obj = entity_obj.get_node(settings['to'])
+                modules = []
+
+                for mod in settings.get('modules', []):
+                    process_mod(mod,
+                                self._identifier.path / 'system' /
+                                entity_name / edge,
+                                modules)
+
+                start_obj.add_out_edge(Edge(start_obj, end_obj, edge, modules))
+
+        for edge, settings in system_yaml.get('edges', {}).items():
+            start_obj = self._entities[settings['from']['entity']].get_node(
+                settings['from']['node'])
+            end_obj = self._entities[settings['to']['entity']].get_node(
+                settings['to']['node'])
+            modules = []
+
+            for mod in settings.get('modules', []):
+                process_mod(mod,
+                            self._identifier.path / 'system' / edge,
+                            modules)
+
+            start_obj.add_out_edge(Edge(start_obj, end_obj, edge, modules))
 
         for entity_dir in (self._identifier.path / 'system').glob('*'):
             if not entity_dir.is_dir():
@@ -372,8 +412,8 @@ class Session:
             with (entity_dir / 'dirmeta.json').open(mode='r') as f:
                 metadata = json.load(f)
 
-            self._entity_exit_codes[entity_dir.name] = \
-                metadata.get('exit_code', -1)
+            self._entities[entity_dir.name].set_exit_code(
+                metadata.get('exit_code', -1))
 
     @property
     def identifier(self):
@@ -381,7 +421,8 @@ class Session:
 
     def get_system_graph_json(self, json_type: str = 'sigma.js'):
         entity_metadata = {
-            e.name: [e.exit_code, e.get_hex_colour()] for e in self._entities
+            k: [e.get_exit_code(), e.get_hex_colour()]
+            for k, e in self._entities.items()
         }
 
         if json_type == 'sigma.js':
