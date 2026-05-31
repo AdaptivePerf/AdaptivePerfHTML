@@ -8,12 +8,13 @@ import paqpy
 import sqlalchemy as sql
 import sqlalchemy.orm as orm
 import sqlalchemy.engine
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
 
-class Base(orm.DeclarativeBase):
-    def initialize(url=None, password=None):
+class Context:
+    def __init__(self, url=None, password=None):
         if url is None:
             p = Path.home() / '.adaptyst_analyser'
             p.mkdir(exist_ok=True)
@@ -28,49 +29,56 @@ class Base(orm.DeclarativeBase):
             if password is not None:
                 database_url.password = password
 
-        Base._engine = sql.create_engine(database_url, echo=True)
-        Base.metadata.create_all(Base._engine)
+        self._engine = sql.create_engine(database_url, echo=True)
+        Base.metadata.create_all(self._engine)
 
+    def __enter__(self):
+        return self
 
-class Arrangement(Base):
-    def req_check_name(data):
-        if 'name' not in data:
-            return '', 401
+    def __exit__(self, exception_type, exception_value,
+                 exception_traceback):
+        if not self.is_closed():
+            self.close()
 
-        with orm.Session(Base._engine) as session:
+        return False
+
+    def is_closed(self):
+        return self._engine is None
+
+    def close(self):
+        self._engine.dispose()
+        self._engine = None
+
+    def check_name(self, name: str) -> bool:
+        with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(
-                    Arrangement.name == data['name']))
+                    Arrangement.name == name))
 
-            return json.dumps({
-                'exists': results.first() is not None
-            }), 200
+            return results.first() is not None
 
-    def req_save(data, storage_path: Path):
-        if 'name' not in data or \
-           'data' not in data:
-            return '', 401
-
-        with orm.Session(Base._engine) as session:
+    def save(self, name: str, data: str, storage_path: Path) \
+            -> (str, str):
+        with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(
-                    Arrangement.name == data['name']))
+                    Arrangement.name == name))
             arrgmt = results.first()
 
             if arrgmt is not None:
-                return '', 409
+                raise FileExistsError
 
-            data_decoded = json.loads(data['data'])
+            data_decoded = json.loads(data)
             if 'main_window' in data_decoded:
                 a_type = 'SW'
             else:
                 a_type = 'W'
 
-            arrgmt = Arrangement(name=data['name'],
+            arrgmt = Arrangement(name=name,
                                  a_type=a_type,
                                  last_update=datetime.now(
                                      timezone.utc),
-                                 data=data['data'])
+                                 data=data)
             token_to_return = arrgmt.gen_token()
             session.add(arrgmt)
             session.commit()
@@ -106,62 +114,44 @@ class Arrangement(Base):
                 session.commit()
                 raise e
 
-            return json.dumps({
-                'id': arrgmt.a_id,
-                'token': token_to_return
-            }), 200
+            return arrgmt.a_id, token_to_return
 
-    def req_edit_name(data):
-        if 'name' not in data or \
-           'new_name' not in data:
-            return '', 401
-
-        if 'token' not in data:
-            return '', 403
-
-        with orm.Session(Base._engine) as session:
+    def edit_name(self, name: str, new_name: str, token: str):
+        with orm.Session(self._engine) as session:
             results_new_name_check = session.scalars(
                 sql.select(Arrangement).where(
-                    Arrangement.name == data['new_name']))
+                    Arrangement.name == new_name))
 
             if results_new_name_check.first() is not None:
-                return '', 409
+                raise FileExistsError
 
             results = session.scalars(
                 sql.select(Arrangement).where(
-                    Arrangement.name == data['name']))
+                    Arrangement.name == name))
             arrgmt = results.first()
 
             if arrgmt is None:
-                return '', 404
+                raise FileNotFoundError
 
-            if not arrgmt.check_token(data['token']):
-                return '', 403
+            if not arrgmt.check_token(token):
+                raise PermissionError
 
-            arrgmt.name = data['new_name']
+            arrgmt.name = new_name
             arrgmt.last_update = datetime.now(timezone.utc)
             session.commit()
 
-            return '{}', 200
-
-    def req_delete(data):
-        if 'name' not in data:
-            return '', 401
-
-        if 'token' not in data:
-            return '', 403
-
-        with orm.Session(Base._engine) as session:
+    def delete(self, name, token):
+        with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(
-                    Arrangement.name == data['name']))
+                    Arrangement.name == name))
             arrgmt = results.first()
 
             if arrgmt is None:
-                return '', 404
+                raise FileNotFoundError
 
-            if not arrgmt.check_token(data['token']):
-                return '', 403
+            if not arrgmt.check_token(token):
+                raise PermissionError
 
             session.execute(sql.delete(Session).where(
                 Session.a_id == arrgmt.a_id))
@@ -169,54 +159,47 @@ class Arrangement(Base):
             session.delete(arrgmt)
             session.commit()
 
-            return '{}', 200
+    def _get(self, session, results, storage_path):
+        arrgmt = results.first()
 
-    def req_get(data, storage_path: Path):
-        if ('name' not in data and 'id' not in data) or \
-           ('name' in data and 'id' in data):
-            return '', 401
+        if arrgmt is None:
+            raise FileNotFoundError
 
-        with orm.Session(Base._engine) as session:
-            if 'id' in data:
-                results = session.scalars(
-                    sql.select(Arrangement).where(
-                        Arrangement.a_id == data['id']))
-            else:
-                results = session.scalars(
-                    sql.select(Arrangement).where(
-                        Arrangement.name == data['name']))
+        perf_session_results = session.scalars(
+            sql.select(Session).where(
+                Session.a_id == arrgmt.a_id))
 
-            arrgmt = results.first()
+        for perf_session in perf_session_results:
+            if not perf_session.check_fingerprint(storage_path):
+                raise ValueError(perf_session.name)
 
-            if arrgmt is None:
-                return '', 404
+        return arrgmt.data
 
-            perf_session_results = session.scalars(
-                sql.select(Session).where(
-                    Session.a_id == arrgmt.a_id))
+    def get_by_id(self, identifier, storage_path):
+        with orm.Session(self._engine) as session:
+            return self._get(session,
+                             session.scalars(
+                                 sql.select(Arrangement).where(
+                                     Arrangement.a_id == identifier)),
+                             storage_path)
 
-            for perf_session in perf_session_results:
-                if not perf_session.check_fingerprint(storage_path):
-                    return json.dumps({
-                        'session_invalid': perf_session.name
-                        }), 422
+    def get_by_name(self, name, storage_path):
+        with orm.Session(self._engine) as session:
+            return self._get(session,
+                             session.scalars(
+                                 sql.select(Arrangement).where(
+                                     Arrangement.name == name)),
+                             storage_path)
 
-            return arrgmt.data, 200
-
-    def req_list(data):
-        limit = data.get('limit', 10)
-        page = data.get('page', 1)
-        sort = data.get('sort', 'last_update_desc')
-        types = data.get('types', 'both')
-
+    def get_list(self, search, limit, page, sort, types):
         try:
             limit = int(limit)
             page = int(page)
         except Exception:
-            return '', 401
+            raise ValueError
 
         if page < 1:
-            return '', 401
+            raise ValueError
 
         if sort == 'last_update_desc':
             order_by = sql.desc(Arrangement.last_update)
@@ -227,7 +210,7 @@ class Arrangement(Base):
         elif sort == 'name_asc':
             order_by = sql.asc(Arrangement.name)
         else:
-            return '', 401
+            raise ValueError
 
         if types == 'both':
             where = [True]
@@ -236,25 +219,28 @@ class Arrangement(Base):
         elif types == 'SW':
             where = [Arrangement.a_type == 'SW']
         else:
-            return '', 401
+            raise ValueError
 
-        if 'search' in data:
-            where.append(Arrangement.name.regexp_match(data['search']))
+        if search is not None:
+            where.append(Arrangement.name.regexp_match(search))
 
-        with orm.Session(Base._engine) as session:
+        with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(*where).order_by(
                     order_by).limit(limit).offset((page - 1) * limit))
             cnt = session.query(
                 sql.func.count(Arrangement.a_id)).where(*where).scalar()
 
-            return json.dumps({
-                'general_total_cnt': cnt,
-                'general_total_pages': max(1, (cnt // limit) +
-                                           (1 if cnt % limit > 0 else 0)),
-                'list': list(map(Arrangement.to_dict, results))
-            }), 200
+            return cnt, max(1, (cnt // limit) +
+                            (1 if cnt % limit > 0 else 0)), \
+                list(map(Arrangement.to_dict, results))
 
+
+class Base(orm.DeclarativeBase):
+    pass
+
+
+class Arrangement(Base):
     __tablename__ = 'arrangement'
 
     a_id: orm.Mapped[int] = orm.mapped_column(primary_key=True)
