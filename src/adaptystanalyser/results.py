@@ -7,6 +7,8 @@ import random
 from abc import ABC, abstractmethod
 from typing import Union, Self
 from pathlib import Path
+from importlib import import_module
+from . import arrangements as arrgmts
 
 
 class Identifier:
@@ -24,7 +26,7 @@ class Identifier:
                             incorrect.
         """
         if not (result / 'dirmeta.json').exists():
-            raise ValueError(str(result / 'dirmeta.json') + ' does not exist!')
+            raise FileNotFoundError(str(result / 'dirmeta.json') + ' does not exist!')
 
         with (result / 'dirmeta.json').open(mode='r') as f:
             metadata = json.load(f)
@@ -114,21 +116,18 @@ class Identifier:
 
     @property
     def value(self):
-        return str(self) + ': ' + str(self._path)
+        return self._path.name
 
     @property
     def path(self):
         return self._path
 
-    @property
-    def raw_name(self):
-        return self._path.name
-
     def __eq__(self, other):
-        return self.value == other.value
+        return str(self) == str(other) and \
+            str(self.path) == str(other.path)
 
     def __hash__(self):
-        return hash(self.value)
+        return hash(str(self) + str(self.path))
 
 
 class Module(ABC):
@@ -150,7 +149,7 @@ class Analysable:
     def __init__(self, name: str, modules: list[Module]):
         self._name = name
         self._modules = {
-            m.name: m for m in modules
+            m.get_name(): m for m in modules
         }
 
     @property
@@ -169,7 +168,7 @@ class Analysable:
 
 class Edge(Analysable):
     def __init__(self, start, end, name: str, modules: list[Module] = []):
-        super(name, modules)
+        super().__init__(name, modules)
         self._start = start
         self._end = end
 
@@ -190,7 +189,7 @@ class Edge(Analysable):
 
 class Node(Analysable):
     def __init__(self, name: str, entity, modules: list[Module] = []):
-        super(name, modules)
+        super().__init__(name, modules)
         self._out_edges = {}
         self._entity = entity
 
@@ -300,6 +299,8 @@ class Session:
         for x in filter(Path.is_dir, path.glob('*')):
             try:
                 identifier = Identifier(x)
+            except FileNotFoundError:
+                continue
             except ValueError:
                 continue
 
@@ -342,10 +343,12 @@ class Session:
             system_yaml = yaml.safe_load(f)
 
         def process_mod(module_dict, mod_meta_path_prefix,
-                        module_list):
-            module_obj = None
-
+                        module_list, entity, node):
             name = module_dict['name']
+            module_obj = \
+                import_module(f'adaptystanalyser.modules.{name}').get_mod_obj(
+                    self._identifier, entity, node, module_dict.get('options', None))
+
             mod_meta_path = mod_meta_path_prefix / name / 'dirmeta.json'
 
             if not mod_meta_path.exists():
@@ -371,7 +374,7 @@ class Session:
                     process_mod(mod,
                                 self._identifier.path / 'system' /
                                 entity_name / node,
-                                modules)
+                                modules, entity_name, node)
 
                 entity_obj.add_node(Node(node, entity_obj, modules))
 
@@ -384,7 +387,7 @@ class Session:
                     process_mod(mod,
                                 self._identifier.path / 'system' /
                                 entity_name / edge,
-                                modules)
+                                modules, entity_name, edge)
 
                 start_obj.add_out_edge(Edge(start_obj, end_obj, edge, modules))
 
@@ -398,7 +401,7 @@ class Session:
             for mod in settings.get('modules', []):
                 process_mod(mod,
                             self._identifier.path / 'system' / edge,
-                            modules)
+                            modules, None, edge)
 
             start_obj.add_out_edge(Edge(start_obj, end_obj, edge, modules))
 
@@ -446,7 +449,7 @@ class Session:
                                 'color': entity.get_hex_colour(),
                                 'entity': entity.name,
                                 'backends':
-                                [[x.name, x.get_version_used()]
+                                [[x.get_name(), x.get_version_used()]
                                  for x in node.get_modules_iterable()]
                             }
                         }
