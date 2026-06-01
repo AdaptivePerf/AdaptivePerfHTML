@@ -5,10 +5,9 @@ import json
 import yaml
 import random
 from abc import ABC, abstractmethod
-from typing import Union, Self
+from typing import Union
 from pathlib import Path
 from importlib import import_module
-from . import arrangements as arrgmts
 
 
 class Identifier:
@@ -26,7 +25,8 @@ class Identifier:
                             incorrect.
         """
         if not (result / 'dirmeta.json').exists():
-            raise FileNotFoundError(str(result / 'dirmeta.json') + ' does not exist!')
+            raise FileNotFoundError(str(result / 'dirmeta.json') +
+                                    ' does not exist!')
 
         with (result / 'dirmeta.json').open(mode='r') as f:
             metadata = json.load(f)
@@ -135,6 +135,45 @@ class Module(ABC):
     def get_name(self):
         pass
 
+    @abstractmethod
+    def _process_post_request(self, data):
+        pass
+
+    def process_post_request(self, data):
+        self.init()
+        return self._process_post_request(data)
+
+    @abstractmethod
+    def _init(self):
+        pass
+
+    def init(self):
+        if self.is_initialised():
+            return
+
+        if not hasattr(self, '_analysable') or \
+           self._analysable is None:
+            raise RuntimeError('set_analysable() must be ' +
+                               'called before calling init()')
+
+        self._init()
+        self._initialised = True
+
+    def is_initialised(self):
+        if hasattr(self, '_initialised'):
+            return self._initialised
+
+        return False
+
+    def set_analysable(self, analysable):
+        self._analysable = analysable
+
+    def get_analysable(self):
+        if hasattr(self, '_analysable'):
+            return self._analysable
+
+        return None
+
     def set_version_used(self, ver_code: list[int]):
         self._version_used = ver_code
 
@@ -148,9 +187,11 @@ class Module(ABC):
 class Analysable:
     def __init__(self, name: str, modules: list[Module]):
         self._name = name
-        self._modules = {
-            m.get_name(): m for m in modules
-        }
+        self._modules = {}
+
+        for m in modules:
+            m.set_analysable(self)
+            self._modules[m.get_name()] = m
 
     @property
     def name(self):
@@ -347,7 +388,8 @@ class Session:
             name = module_dict['name']
             module_obj = \
                 import_module(f'adaptystanalyser.modules.{name}').get_mod_obj(
-                    self._identifier, entity, node, module_dict.get('options', None))
+                    self._identifier, entity, node,
+                    module_dict.get('options', None))
 
             mod_meta_path = mod_meta_path_prefix / name / 'dirmeta.json'
 
@@ -422,6 +464,36 @@ class Session:
     def identifier(self):
         return self._identifier
 
+    def process_post_request(self, data, entity, node_or_edge, module):
+        if entity is None:
+            raise NotImplementedError
+
+        if entity not in self._entities:
+            raise FileNotFoundError
+
+        entity_obj = self._entities[entity]
+        node = entity_obj.get_node(node_or_edge)
+
+        if node is None:
+            for n in entity_obj.get_nodes_iterable():
+                for e in n.get_out_edges_iterable():
+                    if e.name == node_or_edge:
+                        mod = e.get_module(module)
+
+                        if mod is None:
+                            raise FileNotFoundError
+
+                        return mod.process_post_request(data)
+
+            raise FileNotFoundError
+        else:
+            mod = node.get_module(module)
+
+            if mod is None:
+                raise FileNotFoundError
+
+            return mod.process_post_request(data)
+
     def get_system_graph_json(self, json_type: str = 'sigma.js'):
         entity_metadata = {
             k: [e.get_exit_code(), e.get_hex_colour()]
@@ -480,7 +552,7 @@ class Session:
 class Window(ABC):
     _ids = set()
 
-    def get_arrgmt_json(windows: Union[Self, list[Self]],
+    def get_arrgmt_json(windows,
                         session: Session = None):
         if isinstance(windows, list):
             if session is None:
@@ -534,7 +606,7 @@ class Window(ABC):
         pass
 
     @abstractmethod
-    def get_dependencies(self) -> list[Self]:
+    def get_dependencies(self) -> list:
         pass
 
     @abstractmethod

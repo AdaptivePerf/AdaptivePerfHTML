@@ -63,7 +63,7 @@ class Session {
         }
 
         $.ajax({
-            url: this.id + '/' + entity + '/' + node + '/' + module,
+            url: 'process/' + this.id + '/' + entity + '/' + node + '/' + module,
             method: 'POST',
             dataType: content_type,
             data: data
@@ -2718,7 +2718,7 @@ function loadCurrentSession(ready_handler) {
         let min_mod_vers = JSON.parse($('#viewer_script').attr('data-min-mod-vers'));
 
         $.ajax({
-            url: id + '/',
+            url: 'get/' + id + '/',
             method: 'GET'
         }).done(ajax_obj => {
             let response = JSON.parse(ajax_obj);

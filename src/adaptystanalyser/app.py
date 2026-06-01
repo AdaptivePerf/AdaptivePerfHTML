@@ -4,12 +4,11 @@
 import traceback
 import yaml
 import json
+from . import Session
 from . import arrangements as arrgmts
 from flask import Flask, render_template, request
 from pathlib import Path
-from . import Session, Identifier
 from importlib.metadata import version
-from importlib import import_module
 
 
 app = Flask(__name__)
@@ -54,36 +53,49 @@ for p in Path(app.root_path).glob('modules/*/metadata.yml'):
     min_mod_vers[mod_id] = metadata.get('min_module_version', [])
 
 
-@app.get('/<identifier>/')
+def load_session(identifier):
+    return Session(
+        Path(app.config['PERFORMANCE_ANALYSIS_STORAGE']) / identifier)
+
+
+@app.get('/get/<identifier>/')
 def get(identifier):
     try:
-        results = Session(
-            Path(app.config['PERFORMANCE_ANALYSIS_STORAGE']) / identifier)
-        return results.get_system_graph_json()
+        session = load_session(identifier)
+        return session.get_system_graph_json()
     except FileNotFoundError:
         traceback.print_exc()
         return '', 404
 
 
-@app.post('/<identifier>/<entity>/<node>/<module>')
-def post(identifier, entity, node, module):
+def post(identifier, entity, node_or_edge, module):
     try:
-        try:
-            backend = import_module(f'adaptystanalyser.modules.{module}')
-        except ModuleNotFoundError:
-            traceback.print_exc()
-            return '', 404
-
-        return backend.process(Identifier(Path(
-            app.config['PERFORMANCE_ANALYSIS_STORAGE']) /
-                                          identifier),
-                               entity, node, request.values)
+        session = load_session(identifier)
+        return session.process_post_request(request.values,
+                                            entity, node_or_edge,
+                                            module)
+    except ModuleNotFoundError:
+        traceback.print_exc()
+        return '', 404
+    except FileNotFoundError:
+        traceback.print_exc()
+        return '', 404
     except ValueError:
         traceback.print_exc()
         return '', 404
     except ImportError:
         traceback.print_exc()
         return '', 500
+
+
+@app.post('/process/<identifier>/<entity>/<node_or_edge>/<module>')
+def post1(identifier, entity, node_or_edge, module):
+    post(identifier, entity, node_or_edge, module)
+
+
+@app.post('/process/<identifier>/<edge>/<module>')
+def post2(identifier, edge, module):
+    post(identifier, None, edge, module)
 
 
 @app.post('/arrgmt')
