@@ -1413,12 +1413,9 @@ class Window {
             "id": this.#id,
             "module": this.#module_name,
             "type": this.getType(),
-            "constr": [this.#session != undefined ? this.#session.id : undefined,
-                       this.#entity_id,
-                       this.#node_id,
-                       this.#module_name,
-                       this.#constructor_data,
-                       x, y],
+            "constr": this.getConstructorArgs(),
+            "x": x,
+            "y": y,
             "dependencies": this.getDependencies(),
             "collapsed": this.#collapsed,
             "custom_title": this.#custom_title,
@@ -1427,6 +1424,23 @@ class Window {
             "height": Window.isInCompactMode() ? undefined :
                 (this.#collapsed ? this.#last_height : this.#dom.outerHeight())
         };
+    }
+
+    /**
+     *  Gets the array of arguments passed to the constructor/init(). This is
+     *  useful for serialising/deserialising a window.
+     *
+     *  The default implementation returns arguments number 2 to 5 inclusive
+     *  passed to init().
+     *
+     *  @return Array of constructor/init() arguments.
+     */
+    getConstructorArgs() {
+        return [this.#session != undefined ? this.#session.id : undefined,
+                this.#entity_id,
+                this.#node_id,
+                this.#module_name,
+                this.#constructor_data];
     }
 
     /**

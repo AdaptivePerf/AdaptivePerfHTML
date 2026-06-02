@@ -602,7 +602,7 @@ class Window(ABC):
         pass
 
     @abstractmethod
-    def get_constr_params(self) -> list:
+    def get_constr_args(self) -> list:
         pass
 
     @abstractmethod
@@ -671,11 +671,13 @@ class Window(ABC):
     def set_collapsed(self, collapsed: bool):
         self._collapsed = collapsed
 
-    def to_dict(self):
+    def to_dict(self, x, y):
         to_return = {
             'id': self.get_id(),
             'type': self.get_type(),
-            'constr': self.get_constr_params(),
+            'constr': self.get_constr_args(),
+            'x': x,
+            'y': y,
             'dependencies': list(map(Window.get_id,
                                      self.get_dependencies())),
             'collapsed': self.is_collapsed()
