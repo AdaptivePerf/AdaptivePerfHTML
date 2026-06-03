@@ -209,43 +209,44 @@ class Window {
         let createWindow = window_class => {
             let session = undefined;
 
-            if (obj.constr[0] != undefined) {
-                if (obj.constr[0] in Session.instances) {
-                    session = Session.instances[obj.constr[0]];
+            if (obj.init[0] != undefined) {
+                if (obj.init[0] in Session.instances) {
+                    session = Session.instances[obj.init[0]];
                 } else {
                     session =
-                        new Session(obj.constr[0],
+                        new Session(obj.init[0],
                                     $('#results_combobox').find(
-                                        'option[value="' + obj.constr[0] + '"]').attr(
+                                        'option[value="' + obj.init[0] + '"]').attr(
                                             'data-label'));
                 }
             }
 
-            new window_class(session,
-                             obj.constr[1],
-                             obj.constr[2],
-                             obj.constr[3],
-                             obj.constr[4],
-                             obj.constr[5],
-                             obj.constr[6],
-                             obj.dependencies,
-                             obj.id, obj.width,
-                             obj.height,
-                             w => {
-                                 if (obj.data != undefined) {
-                                     w._importData(obj.data);
-                                 }
+            let window_obj = new window_class(true, ...obj.constr);
+            window_obj.init(window_obj, session,
+                            obj.init[1],
+                            obj.init[2],
+                            obj.init[3],
+                            obj.init[4],
+                            obj.init[5],
+                            obj.init[6],
+                            obj.dependencies,
+                            obj.id, obj.width,
+                            obj.height,
+                            w => {
+                                if (obj.data != undefined) {
+                                    w._importData(obj.data);
+                                }
 
-                                 w.#editTitle(obj.custom_title);
+                                w.#editTitle(obj.custom_title);
 
-                                 if (obj.collapsed && !Window.isInCompactMode()) {
-                                     w.onVisibilityClick();
-                                 }
+                                if (obj.collapsed && !Window.isInCompactMode()) {
+                                    w.onVisibilityClick();
+                                }
 
-                                 if (ready_handler != undefined) {
-                                     ready_handler();
-                                 }
-                             });
+                                if (ready_handler != undefined) {
+                                    ready_handler();
+                                }
+                            });
         };
 
         if (obj.module == undefined) {
@@ -320,7 +321,10 @@ class Window {
     /**
      *  Constructs a Window object. This doesn't do anything
      *  else, including displaying a window: you need to call
-     *  `init()` for this.
+     *  `init()` for this unless the window is deserialized
+     *  (i.e. created by Window.deserialize(), this will
+     *  be indicated by the first argument to the subclass
+     *  constructor set to true).
      *
      *  @constructor
      */
@@ -333,6 +337,10 @@ class Window {
      *  corresponding to the object. This function must
      *  be called by all subclasses from their constructor,
      *  with the first argument being JavaScript "this".
+     *
+     *  The method should not be overridden: otherwise,
+     *  the serialising/deserialising feature won't work
+     *  properly if at all.
      *
      *  @param {Object} [instance] A Window subclass object
      *  referred to by JavaScript "this" inside the subclass
@@ -1370,6 +1378,7 @@ class Window {
      *    "module": <module name>,
      *    "type": <window type>,
      *    "constr": <array of arguments to be passed to the window constructor>,
+     *    "init": <array of arguments to be passed to init()>,
      *    "dependencies": <window dependencies as returned by getDependencies()>,
      *    "collapsed": <whether the window is collapsed>,
      *    "custom_title": <custom title if any, may be omitted>,
@@ -1414,6 +1423,7 @@ class Window {
             "module": this.#module_name,
             "type": this.getType(),
             "constr": this.getConstructorArgs(),
+            "init": this.getKeyInitArgs(),
             "x": x,
             "y": y,
             "dependencies": this.getDependencies(),
@@ -1427,15 +1437,26 @@ class Window {
     }
 
     /**
-     *  Gets the array of arguments passed to the constructor/init(). This is
+     *  Gets the array of arguments passed to the constructor (not init()). This is
      *  useful for serialising/deserialising a window.
      *
-     *  The default implementation returns arguments number 2 to 5 inclusive
-     *  passed to init().
+     *  The default implementation returns an empty array.
      *
-     *  @return Array of constructor/init() arguments.
+     *  @return Array of constructor arguments.
      */
     getConstructorArgs() {
+        return [];
+    }
+
+    /**
+     *  Gets the array of arguments number 2 to 6 inclusive passed to init()
+     *  (a Session object is converted to a string representing session ID).
+     *  This is useful for serialising/deserialising a window and should not be
+     *  overridden.
+     *
+     *  @return Array of key init() arguments.
+     */
+    getKeyInitArgs() {
         return [this.#session != undefined ? this.#session.id : undefined,
                 this.#entity_id,
                 this.#node_id,
