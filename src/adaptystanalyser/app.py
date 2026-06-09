@@ -90,12 +90,12 @@ def post(identifier, entity, node_or_edge, module):
 
 @app.post('/process/<identifier>/<entity>/<node_or_edge>/<module>')
 def post1(identifier, entity, node_or_edge, module):
-    post(identifier, entity, node_or_edge, module)
+    return post(identifier, entity, node_or_edge, module)
 
 
 @app.post('/process/<identifier>/<edge>/<module>')
 def post2(identifier, edge, module):
-    post(identifier, None, edge, module)
+    return post(identifier, None, edge, module)
 
 
 @app.post('/arrgmt')

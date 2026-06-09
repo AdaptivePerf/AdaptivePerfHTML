@@ -8,7 +8,6 @@ import paqpy
 import sqlalchemy as sql
 import sqlalchemy.orm as orm
 import sqlalchemy.engine
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -99,13 +98,13 @@ class Context:
 
                 if 'main_window' in data_decoded:
                     add_session(data_decoded['main_window'].get(
-                        'constr', [None])[0])
+                        'session', None))
 
                     for w in data_decoded.get('other_windows', {}).values():
-                        add_session(w.get('constr', [None])[0])
+                        add_session(w.get('session', None))
                 else:
                     for w in data_decoded.get('windows', {}).values():
-                        add_session(w.get('constr', [None])[0])
+                        add_session(w.get('session', None))
 
                 session.commit()
             except Exception as e:

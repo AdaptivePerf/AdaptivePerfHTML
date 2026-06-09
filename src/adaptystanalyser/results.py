@@ -131,37 +131,45 @@ class Identifier:
 
 
 class Module(ABC):
+    def needs_loading(method):
+        def load_internals_and_run(self, *args, **kwargs):
+            self.load()
+            return method(self, *args, **kwargs)
+
+        return load_internals_and_run
+
     @abstractmethod
     def get_name(self):
         pass
 
     @abstractmethod
-    def _process_post_request(self, data):
-        pass
-
     def process_post_request(self, data):
-        self.init()
-        return self._process_post_request(data)
+        pass
 
     @abstractmethod
-    def _init(self):
+    def _load(self):
         pass
 
-    def init(self):
-        if self.is_initialised():
+    def load(self):
+        if self.is_loaded():
             return
 
         if not hasattr(self, '_analysable') or \
            self._analysable is None:
             raise RuntimeError('set_analysable() must be ' +
-                               'called before calling init()')
+                               'called before calling load()')
 
-        self._init()
-        self._initialised = True
+        if not hasattr(self, '_session') or \
+           self._session is None:
+            raise RuntimeError('set_session() must be ' +
+                               'called before calling load()')
 
-    def is_initialised(self):
-        if hasattr(self, '_initialised'):
-            return self._initialised
+        self._load()
+        self._loaded = True
+
+    def is_loaded(self):
+        if hasattr(self, '_loaded'):
+            return self._loaded
 
         return False
 
@@ -171,6 +179,15 @@ class Module(ABC):
     def get_analysable(self):
         if hasattr(self, '_analysable'):
             return self._analysable
+
+        return None
+
+    def set_session(self, session):
+        self._session = session
+
+    def get_session(self):
+        if hasattr(self, '_session'):
+            return self._session
 
         return None
 
@@ -185,9 +202,11 @@ class Module(ABC):
 
 
 class Analysable:
-    def __init__(self, name: str, modules: list[Module]):
+    def __init__(self, name: str, modules: list[Module],
+                 entity=None):
         self._name = name
         self._modules = {}
+        self._entity = entity
 
         for m in modules:
             m.set_analysable(self)
@@ -202,6 +221,10 @@ class Analysable:
 
     def get_modules_iterable(self):
         return self._modules.values()
+
+    @property
+    def entity(self):
+        return self._entity
 
     def __hash__(self):
         return hash(self._name)
@@ -230,9 +253,8 @@ class Edge(Analysable):
 
 class Node(Analysable):
     def __init__(self, name: str, entity, modules: list[Module] = []):
-        super().__init__(name, modules)
+        super().__init__(name, modules, entity)
         self._out_edges = {}
-        self._entity = entity
 
     def add_out_edge(self, edge: Edge):
         if edge.name in self._out_edges:
@@ -252,10 +274,6 @@ class Node(Analysable):
 
     def get_out_edges_iterable(self):
         return self._out_edges.values()
-
-    @property
-    def entity(self):
-        return self._entity
 
     def get_export_name(self):
         return f'{self.entity.name}_{self.name}'
@@ -403,6 +421,7 @@ class Session:
                 return
 
             module_obj.set_version_used(mod_meta['version'])
+            module_obj.set_session(self)
             modules.append(module_obj)
 
         for entity_name, entity in system_yaml['entities'].items():
@@ -464,7 +483,13 @@ class Session:
     def identifier(self):
         return self._identifier
 
-    def process_post_request(self, data, entity, node_or_edge, module):
+    def get_entity(self, name: str) -> Entity:
+        return self._entities.get(name, None)
+
+    def get_entities_iterable(self):
+        return self._entities.values()
+
+    def process_post_request(self, data, entity, analysable, module):
         if entity is None:
             raise NotImplementedError
 
@@ -472,12 +497,12 @@ class Session:
             raise FileNotFoundError
 
         entity_obj = self._entities[entity]
-        node = entity_obj.get_node(node_or_edge)
+        node = entity_obj.get_node(analysable)
 
         if node is None:
             for n in entity_obj.get_nodes_iterable():
                 for e in n.get_out_edges_iterable():
-                    if e.name == node_or_edge:
+                    if e.name == analysable:
                         mod = e.get_module(module)
 
                         if mod is None:
@@ -554,15 +579,30 @@ class Window(ABC):
 
     def get_arrgmt_json(windows,
                         session: Session = None):
+        cur_x = 10
+        cur_y = 10
+
+        def get_x():
+            nonlocal cur_x
+            to_return = cur_x
+            cur_x += 10
+            return to_return
+
+        def get_y():
+            nonlocal cur_y
+            to_return = cur_y
+            cur_y += 10
+            return to_return
+
         if isinstance(windows, list):
             if session is None:
                 raise ValueError('"session" must not be None '
                                  'if "windows" is a list!')
 
             return json.dumps({
-                'session': session.identifier.raw_name,
+                'session': session.identifier.value,
                 'windows': {
-                    w.get_id(): w.to_dict() for w in windows
+                    w.get_id(): w.to_dict(get_x(), get_y()) for w in windows
                 }
             })
         else:
@@ -584,12 +624,13 @@ class Window(ABC):
             to_return = {
                 'main_window': windows.to_dict(),
                 'other_windows': {
-                    w.get_id(): w.to_dict() for w in all_dependencies
+                    w.get_id(): w.to_dict(get_x(), get_y(), True)
+                    for w in all_dependencies
                 }
             }
 
             if session is not None:
-                to_return['session'] = session.identifier.raw_name
+                to_return['session'] = session.identifier.value
 
             return json.dumps(to_return)
 
@@ -610,11 +651,19 @@ class Window(ABC):
         pass
 
     @abstractmethod
+    def get_init_data(self):
+        pass
+
+    @abstractmethod
     def get_data(self):
         pass
 
     @abstractmethod
     def get_session(self) -> Session:
+        pass
+
+    @abstractmethod
+    def get_analysable(self) -> Analysable:
         pass
 
     def set_id(self, identifier):
@@ -671,21 +720,40 @@ class Window(ABC):
     def set_collapsed(self, collapsed: bool):
         self._collapsed = collapsed
 
-    def to_dict(self, x, y):
+    def set_x(self, x: float):
+        self._x = x
+
+    def set_y(self, y: float):
+        self._y = y
+
+    def to_dict(self, x=None, y=None, collapsed=None):
         to_return = {
             'id': self.get_id(),
             'type': self.get_type(),
             'constr': self.get_constr_args(),
-            'x': x,
-            'y': y,
             'dependencies': list(map(Window.get_id,
                                      self.get_dependencies())),
             'collapsed': self.is_collapsed()
+            if collapsed is None else collapsed
         }
+
+        if hasattr(self, '_x') and self._x is not None:
+            to_return['x'] = self._x
+        elif x is not None:
+            to_return['x'] = x
+
+        if hasattr(self, '_y') and self._y is not None:
+            to_return['y'] = self._y
+        elif y is not None:
+            to_return['y'] = y
 
         module = self.get_module()
         custom_title = self.get_custom_title()
         data = self.get_data()
+
+        init_data = self.get_init_data()
+        session = self.get_session()
+        analysable = self.get_analysable()
 
         if module is not None:
             to_return['module'] = module.get_name()
@@ -695,5 +763,17 @@ class Window(ABC):
 
         if data is not None:
             to_return['data'] = data
+
+        if init_data is not None:
+            to_return['init_data'] = init_data
+
+        if session is not None:
+            to_return['session'] = session.identifier.value
+
+        if analysable is not None:
+            to_return['analysable'] = analysable.name
+
+            if analysable.entity is not None:
+                to_return['entity'] = analysable.entity.name
 
         return to_return
