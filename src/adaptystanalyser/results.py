@@ -4,6 +4,8 @@
 import json
 import yaml
 import random
+import friendly_names
+from . import arrangements as arrgmts
 from abc import ABC, abstractmethod
 from typing import Union
 from pathlib import Path
@@ -483,6 +485,22 @@ class Session:
     def identifier(self):
         return self._identifier
 
+    def get_url(self, compact: bool = False,
+                hide_header: bool = False,
+                hide_footer: bool = False):
+        url_end = '/?session=' + self._identifier.value
+
+        if compact:
+            url_end += '&compact=1'
+
+            if hide_header:
+                url_end += '&hide_header=1'
+
+            if hide_footer:
+                url_end += '&hide_footer=1'
+
+        return url_end
+
     def get_entity(self, name: str) -> Entity:
         return self._entities.get(name, None)
 
@@ -578,7 +596,8 @@ class Window(ABC):
     _ids = set()
 
     def get_arrgmt_json(windows,
-                        session: Session = None):
+                        session: Session = None,
+                        return_session_storage_paths: bool = False):
         cur_x = 10
         cur_y = 10
 
@@ -596,15 +615,43 @@ class Window(ABC):
 
         if isinstance(windows, list):
             if session is None:
-                raise ValueError('"session" must not be None '
-                                 'if "windows" is a list!')
+                for w in windows:
+                    session = w.get_session()
 
-            return json.dumps({
+                    if session is not None:
+                        break
+
+                if session is None:
+                    raise ValueError('A window arrangement must have ' +
+                                     'a session assigned and no session ' +
+                                     'could be extracted from the ' +
+                                     'provided windows!')
+
+            dictionary = {
                 'session': session.identifier.value,
                 'windows': {
                     w.get_id(): w.to_dict(get_x(), get_y()) for w in windows
                 }
-            })
+            }
+
+            for w in windows:
+                for d in w.get_dependencies():
+                    if d.get_id() not in dictionary['windows']:
+                        raise ValueError('No window "' + d.get_id() + '" ' +
+                                         'found which is a dependency of ' +
+                                         'another window!')
+
+            if return_session_storage_paths:
+                paths = set()
+                for w in windows:
+                    s = w.get_session()
+
+                    if s is not None:
+                        paths.add(s.identifier.path.parent)
+
+                return json.dumps(dictionary), paths
+            else:
+                return json.dumps(dictionary)
         else:
             cur_dependencies = set(windows.get_dependencies())
             all_dependencies = set(cur_dependencies)
@@ -621,6 +668,16 @@ class Window(ABC):
 
                 cur_dependencies = new_dependencies
 
+            if session is None:
+                session = windows.get_session()
+
+                if session is None:
+                    for w in all_dependencies:
+                        session = w.get_session()
+
+                        if session is not None:
+                            break
+
             to_return = {
                 'main_window': windows.to_dict(),
                 'other_windows': {
@@ -632,7 +689,66 @@ class Window(ABC):
             if session is not None:
                 to_return['session'] = session.identifier.value
 
-            return json.dumps(to_return)
+            if return_session_storage_paths:
+                paths = set()
+
+                s = windows.get_session()
+
+                if s is not None:
+                    paths.add(s.identifier.path.parent)
+
+                for w in all_dependencies:
+                    s = w.get_session()
+
+                    if s is not None:
+                        paths.add(s.identifier.path.parent)
+
+                return json.dumps(to_return), paths
+            else:
+                return json.dumps(to_return)
+
+    def save_arrgmt(windows,
+                    name: str = None,
+                    session: Session = None,
+                    db_url: str = None,
+                    db_pass: str = None):
+        to_save, storage_paths = Window.get_arrgmt_json(windows, session, True)
+
+        if len(storage_paths) == 0:
+            storage_path = None
+        elif len(storage_paths) > 1:
+            raise NotImplementedError(
+                'At the moment, all sessions which windows to be saved ' +
+                'relate to must be stored in the same path.')
+        else:
+            storage_path = next(iter(storage_paths))
+
+        with arrgmts.Context(db_url, db_pass) as cxt:
+            if name is None:
+                while True:
+                    try:
+                        name = friendly_names.generate(separator=' ')
+                        return *(cxt.save(name, to_save, storage_path)), name
+                    except FileExistsError:
+                        pass
+            else:
+                return cxt.save(name, to_save, storage_path)
+
+    def get_arrgmt_url(identifier: int,
+                       compact: bool = True,
+                       hide_header: bool = True,
+                       hide_footer: bool = True):
+        url_end = '/?arrgmt=' + str(identifier)
+        if compact:
+            url_end += '&compact=1'
+
+            if hide_header:
+                url_end += '&hide_header=1'
+
+            if hide_footer:
+                url_end += '&hide_footer=1'
+
+        return url_end
 
     @abstractmethod
     def get_module(self) -> Module:

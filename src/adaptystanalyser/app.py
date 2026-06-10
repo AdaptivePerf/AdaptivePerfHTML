@@ -4,6 +4,7 @@
 import traceback
 import yaml
 import json
+import friendly_names
 from . import Session
 from . import arrangements as arrgmts
 from flask import Flask, render_template, request
@@ -68,11 +69,11 @@ def get(identifier):
         return '', 404
 
 
-def post(identifier, entity, node_or_edge, module):
+def post(identifier, entity, analysable, module):
     try:
         session = load_session(identifier)
         return session.process_post_request(request.values,
-                                            entity, node_or_edge,
+                                            entity, analysable,
                                             module)
     except ModuleNotFoundError:
         traceback.print_exc()
@@ -88,14 +89,14 @@ def post(identifier, entity, node_or_edge, module):
         return '', 500
 
 
-@app.post('/process/<identifier>/<entity>/<node_or_edge>/<module>')
-def post1(identifier, entity, node_or_edge, module):
-    return post(identifier, entity, node_or_edge, module)
+@app.post('/process/<identifier>/<entity>/<analysable>/<module>')
+def post1(identifier, entity, analysable, module):
+    return post(identifier, entity, analysable, module)
 
 
-@app.post('/process/<identifier>/<edge>/<module>')
-def post2(identifier, edge, module):
-    return post(identifier, None, edge, module)
+@app.post('/process/<identifier>/<analysable>/<module>')
+def post2(identifier, analysable, module):
+    return post(identifier, None, analysable, module)
 
 
 @app.post('/arrgmt')
@@ -111,26 +112,48 @@ def arrgmt_post():
 
     with arrgmts.Context(db_url, db_pass) as cxt:
         if req_type == 'check_name':
-            if 'name' not in vals:
-                return '', 401
+            if 'name' not in vals or vals['name'] is None:
+                # This indicates that a random name will
+                # be used, so we can return False here.
+                return json.dumps({
+                    'exists': False
+                })
 
             return json.dumps({
                 'exists': cxt.check_name(vals['name'])
             }), 200
         elif req_type == 'save':
-            if 'name' not in vals or \
-               'data' not in vals:
+            if 'data' not in vals:
                 return '', 401
 
             try:
-                identifier, token = cxt.save(
-                    vals['name'], vals['data'],
-                    Path(app.config['PERFORMANCE_ANALYSIS_STORAGE']))
+                if 'name' not in vals or vals['name'] is None:
+                    while True:
+                        name = friendly_names.generate(separator=' ')
 
-                return json.dumps({
-                    'id': identifier,
-                    'token': token
-                }), 200
+                        try:
+                            identifier, token = cxt.save(
+                                name, vals['data'],
+                                Path(app.config[
+                                    'PERFORMANCE_ANALYSIS_STORAGE']))
+                            break
+                        except FileExistsError:
+                            pass
+
+                    return json.dumps({
+                        'id': identifier,
+                        'name': name,
+                        'token': token
+                    }), 200
+                else:
+                    identifier, token = cxt.save(
+                        vals['name'], vals['data'],
+                        Path(app.config['PERFORMANCE_ANALYSIS_STORAGE']))
+
+                    return json.dumps({
+                        'id': identifier,
+                        'token': token
+                    }), 200
             except FileExistsError:
                 return '', 409
         elif req_type == 'edit_name':
