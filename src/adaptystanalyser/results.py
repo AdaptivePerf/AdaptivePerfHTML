@@ -85,6 +85,30 @@ class Identifier:
             f'{self._year}-{self._month}-{self._day} ' \
             f'{self._hour}:{self._minute}:{self._second})'
 
+    def get_detailed_path(self, entity=None,
+                          analysable=None, module=None):
+        if isinstance(entity, Entity):
+            entity = entity.name
+
+        if isinstance(analysable, Analysable):
+            analysable = analysable.name
+
+        if isinstance(module, Module):
+            module = module.get_name()
+
+        to_return = self._path / 'system'
+
+        if entity is not None:
+            to_return = to_return / entity
+
+        if analysable is not None:
+            to_return = to_return / analysable
+
+        if module is not None:
+            to_return = to_return / module
+
+        return to_return
+
     @property
     def label(self):
         return self._label
