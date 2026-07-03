@@ -364,6 +364,7 @@ class Window {
      *  objects or string IDs this window depends on, e.g. for obtaining data.
      *  It can be undefined.
      *  @param {String} [custom_id] The ID to be assigned to a window.
+     *  All whitespaces are automatically replaced with an underscore.
      *  Leave this undefined unless you know what you're doing.
      *  @param {float} [width] Width of a window. It cannot be smaller
      *  than the minimum width specified in the CSS stylesheet of the
@@ -387,22 +388,22 @@ class Window {
 
         if (custom_id == undefined) {
             if (session == undefined) {
-                id = `w_${this.getType()}_${index}`;
+                id = `w_${this.getType()}_${index}`.replace(/\s/g, '_');
 
                 while (id in Window.instances) {
                     index++;
-                    id = `w_${this.getType()}_${index}`;
+                    id = `w_${this.getType()}_${index}`.replace(/\s/g, '_');
                 }
             } else {
-                id = `w_${session.label}_${this.getType()}_${index}`;
+                id = `w_${session.label}_${this.getType()}_${index}`.replace(/\s/g, '_');
 
                 while (id in Window.instances) {
                     index++;
-                    id = `w_${session.label}_${this.getType()}_${index}`;
+                    id = `w_${session.label}_${this.getType()}_${index}`.replace(/\s/g, '_');
                 }
             }
         } else {
-            id = custom_id;
+            id = custom_id.replace(/\s/g, '_');
         }
 
         Window.instances[id] = instance;
