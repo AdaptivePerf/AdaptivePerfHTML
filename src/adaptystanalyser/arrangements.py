@@ -13,7 +13,21 @@ from pathlib import Path
 
 
 class Context:
+    """
+    A class managing connections to a database storing window arrangements.
+    """
+
     def __init__(self, url=None, password=None):
+        """
+        Construct a Context object and initialise the database connection.
+
+        The default database is an SQLite one, stored at
+        ``~/.adaptyst_analyser/db.sqlite`` and created automatically
+        if not existing yet.
+
+        :param str url: The database URL to use. Use the SQLAlchemy syntax.
+        :param str password: The database password.
+        """
         if url is None:
             p = Path.home() / '.adaptyst_analyser'
             p.mkdir(exist_ok=True)
@@ -42,13 +56,24 @@ class Context:
         return False
 
     def is_closed(self):
+        """
+        Return whether the database context has been closed.
+        """
         return self._engine is None
 
     def close(self):
+        """
+        Close the context.
+        """
         self._engine.dispose()
         self._engine = None
 
     def check_name(self, name: str) -> bool:
+        """
+        Return whether an arrangement with a given name exists.
+
+        :param str name: The arrangement name to check.
+        """
         with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(
@@ -58,6 +83,16 @@ class Context:
 
     def save(self, name: str, data: str, storage_path: Path) \
             -> (str, str):
+        """
+        Save a new window arrangement in the database and returns
+        a tuple (<arrangement identifier>, <arrangement update token>).
+
+        :param str name: The name of the arrangement.
+        :param str data: The JSON data describing the arrangement.
+        :param pathlib.Path storage_path: The parent path of referenced
+                                          performance analysis sessions.
+        :raises FileExistsError: When an arrangement with the given name exists.
+        """
         with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(
@@ -116,6 +151,16 @@ class Context:
             return arrgmt.a_id, token_to_return
 
     def edit_name(self, name: str, new_name: str, token: str):
+        """
+        Rename a saved arrangement.
+
+        :param str name: The current arrangement name.
+        :param str new_name: The new arrangement name.
+        :param str token: The update token for the arrangement.
+        :raises FileExistsError: When the new name is already in use.
+        :raises FileNotFoundError: When the arrangement does not exist.
+        :raises PermissionError: When the update token is invalid.
+        """
         with orm.Session(self._engine) as session:
             results_new_name_check = session.scalars(
                 sql.select(Arrangement).where(
@@ -140,6 +185,14 @@ class Context:
             session.commit()
 
     def delete(self, name, token):
+        """
+        Delete a saved arrangement.
+
+        :param str name: The arrangement name.
+        :param str token: The update token for the arrangement.
+        :raises FileNotFoundError: When the arrangement does not exist.
+        :raises PermissionError: When the update token is invalid.
+        """
         with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(
@@ -175,6 +228,17 @@ class Context:
         return arrgmt.data
 
     def get_by_id(self, identifier, storage_path):
+        """
+        Return saved arrangement data by identifier.
+
+        :param int identifier: The arrangement identifier.
+        :param pathlib.Path storage_path: The parent path of
+                                          performance analysis sessions
+                                          referenced by the arrangement.
+        :raises FileNotFoundError: When the arrangement does not exist.
+        :raises ValueError: When a referenced session has changed or is
+                            unavailable.
+        """
         with orm.Session(self._engine) as session:
             return self._get(session,
                              session.scalars(
@@ -183,6 +247,17 @@ class Context:
                              storage_path)
 
     def get_by_name(self, name, storage_path):
+        """
+        Return saved arrangement data by name.
+
+        :param str name: The arrangement name.
+        :param pathlib.Path storage_path: The parent path of
+                                          performance analysis sessions
+                                          referenced by the arrangement.
+        :raises FileNotFoundError: When the arrangement does not exist.
+        :raises ValueError: When a referenced session has changed or is
+                            unavailable.
+        """
         with orm.Session(self._engine) as session:
             return self._get(session,
                              session.scalars(
@@ -191,6 +266,28 @@ class Context:
                              storage_path)
 
     def get_list(self, search, limit, page, sort, types):
+        """
+        Queries the saved arrangements and returns information
+        necessary for displaying the query results with pagination:
+        a tuple (<number of all arrangements matching the query>,
+        <total number of arrangement pages matching the query>,
+        <list of arrangements in form of dictionaries obtained by
+        Arrangement.to_dict()>).
+
+        :param str search: A regular expression used to filter names.
+                           Use None if you don't want to filter names.
+        :param limit: The maximum number of arrangements to return at once.
+        :param page: Number indicating what page of the query results
+                     should be returned.
+        :param str sort: The query result sorting method. Use one of
+                         "last_update_desc", "last_update_asc", "name_desc",
+                         and "name_asc".
+        :param str types: The arrangement type to display. Use one of
+                          "W" (window arrangements), "SW" (single window
+                          arrangements), and "both".
+        :raises ValueError: When the value of "limit", "page", "sort",
+                            and/or "types" is invalid.
+        """
         try:
             limit = int(limit)
             page = int(page)
@@ -240,6 +337,11 @@ class Base(orm.DeclarativeBase):
 
 
 class Arrangement(Base):
+    """
+    A class describing a saved window arrangement, using
+    SQLAlchemy ORM.
+    """
+
     __tablename__ = 'arrangement'
 
     a_id: orm.Mapped[int] = orm.mapped_column(primary_key=True)
@@ -251,6 +353,9 @@ class Arrangement(Base):
     data: orm.Mapped[str]
 
     def gen_token(self):
+        """
+        Generate, store, and return an update token for the arrangement.
+        """
         token_to_return = os.urandom(32).hex()
         self.token_salt = os.urandom(32)
         self.token = hashlib.pbkdf2_hmac('sha256',
@@ -260,6 +365,11 @@ class Arrangement(Base):
         return token_to_return
 
     def check_token(self, user_token):
+        """
+        Return whether a given update token is valid for the arrangement.
+
+        :param str user_token: The update token to validate.
+        """
         hashed_token = hashlib.pbkdf2_hmac('sha256',
                                            user_token.encode('utf-8'),
                                            self.token_salt,
@@ -267,6 +377,9 @@ class Arrangement(Base):
         return hashed_token == self.token
 
     def to_dict(self):
+        """
+        Return the public metadata of the arrangement as a dictionary.
+        """
         return {
             'id': self.a_id,
             'name': self.name,
@@ -279,6 +392,11 @@ class Arrangement(Base):
 
 
 class Session(Base):
+    """
+    A class representing a performance analysis session that can
+    be linked to one or more arrangements. This uses SQLAlchemy ORM.
+    """
+
     __tablename__ = 'session'
 
     a_id: orm.Mapped[int] = orm.mapped_column(
@@ -289,6 +407,13 @@ class Session(Base):
     last_update_or_successful_check: orm.Mapped[datetime]
 
     def gen_fingerprint(self, storage_path: Path):
+        """
+        Generate and store a fingerprint of the session, based on its
+        directory contents. Nothing is returned.
+
+        :param pathlib.Path storage_path: The parent path of the session.
+        :raises FileNotFoundError: When the session directory does not exist.
+        """
         p = storage_path / self.name
         if not p.exists():
             raise FileNotFoundError(str(p))
@@ -298,6 +423,15 @@ class Session(Base):
             datetime.now(timezone.utc)
 
     def check_fingerprint(self, storage_path: Path):
+        """
+        Return whether the linked session directory matches the fingerprint
+        stored in the object.
+
+        If the check succeeds, the last successful check time is refreshed
+        accordingly.
+
+        :param pathlib.Path storage_path: The parent path of the session.
+        """
         p = storage_path / self.name
         if not p.exists():
             return False
