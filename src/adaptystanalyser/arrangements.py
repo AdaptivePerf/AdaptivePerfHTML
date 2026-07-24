@@ -42,7 +42,7 @@ class Context:
             if password is not None:
                 database_url.password = password
 
-        self._engine = sql.create_engine(database_url, echo=True)
+        self._engine = sql.create_engine(database_url)
         Base.metadata.create_all(self._engine)
 
     def __enter__(self):
