@@ -1122,7 +1122,10 @@ class Window(ABC):
     @abstractmethod
     def get_type(self) -> str:
         """
-        Return the type identifier of the window.
+        Return the type identifier of the window. On the client
+        side in JavaScript, this must match the return value of
+        getType() in the corresponding module class and be recognised by
+        getWindowClass().
         """
         pass
 
