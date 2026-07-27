@@ -4,12 +4,12 @@
 import traceback
 import yaml
 import json
+import friendly_names
+from . import Session
 from . import arrangements as arrgmts
 from flask import Flask, render_template, request
 from pathlib import Path
-from . import PerformanceAnalysisResults
 from importlib.metadata import version
-from importlib import import_module
 
 
 app = Flask(__name__)
@@ -20,6 +20,9 @@ if 'PERFORMANCE_ANALYSIS_STORAGE' not in app.config:
     raise RuntimeError('Please set FLASK_PERFORMANCE_ANALYSIS_STORAGE environment '
                        'variable to the absolute path to a directory where '
                        'Adaptyst performance analysis results are stored.')
+
+if 'BACKGROUND_CSS' in app.config and ';' in app.config.get('BACKGROUND_CSS'):
+    raise RuntimeError('Semicolons are not allowed in FLASK_BACKGROUND_CSS')
 
 
 static_path = Path(app.root_path) / 'static'
@@ -53,32 +56,34 @@ for p in Path(app.root_path).glob('modules/*/metadata.yml'):
         metadata = yaml.safe_load(f)
     min_mod_vers[mod_id] = metadata.get('min_module_version', [])
 
-arrgmts.Base.initialize(app.config.get('DATABASE_URL', None),
-                        app.config.get('DATABASE_PASSWORD', None))
+
+def load_session(identifier):
+    return Session(
+        Path(app.config['PERFORMANCE_ANALYSIS_STORAGE']) / identifier)
 
 
-@app.get('/<identifier>/')
+@app.get('/get/<identifier>/')
 def get(identifier):
     try:
-        results = PerformanceAnalysisResults(
-            app.config['PERFORMANCE_ANALYSIS_STORAGE'],
-            identifier)
-        return results.get_system_graph()
-    except ValueError:
+        session = load_session(identifier)
+        return session.get_system_graph_json()
+    except FileNotFoundError:
+        traceback.print_exc()
         return '', 404
 
 
-@app.post('/<identifier>/<entity>/<node>/<module>')
-def post(identifier, entity, node, module):
+def post(identifier, entity, analysable, module):
     try:
-        try:
-            backend = import_module(f'adaptystanalyser.modules.{module}')
-        except ModuleNotFoundError:
-            traceback.print_exc()
-            return '', 404
-
-        return backend.process(app.config['PERFORMANCE_ANALYSIS_STORAGE'],
-                               identifier, entity, node, request.values)
+        session = load_session(identifier)
+        return session.process_post_request(request.values,
+                                            entity, analysable,
+                                            module)
+    except ModuleNotFoundError:
+        traceback.print_exc()
+        return '', 404
+    except FileNotFoundError:
+        traceback.print_exc()
+        return '', 404
     except ValueError:
         traceback.print_exc()
         return '', 404
@@ -87,29 +92,142 @@ def post(identifier, entity, node, module):
         return '', 500
 
 
+@app.post('/process/<identifier>/<entity>/<analysable>/<module>')
+def post1(identifier, entity, analysable, module):
+    return post(identifier, entity, analysable, module)
+
+
+@app.post('/process/<identifier>/<analysable>/<module>')
+def post2(identifier, analysable, module):
+    return post(identifier, None, analysable, module)
+
+
 @app.post('/arrgmt')
 def arrgmt_post():
-    if 'type' not in request.values:
-        return '', 401
+    vals = request.values
 
-    req_type = request.values['type']
+    if 'type' not in vals:
+        return '', 400
 
-    if req_type == 'check_name':
-        return arrgmts.Arrangement.req_check_name(request.values)
-    elif req_type == 'save':
-        return arrgmts.Arrangement.req_save(
-            request.values, Path(app.config['PERFORMANCE_ANALYSIS_STORAGE']))
-    elif req_type == 'edit_name':
-        return arrgmts.Arrangement.req_edit_name(request.values)
-    elif req_type == 'delete':
-        return arrgmts.Arrangement.req_delete(request.values)
-    elif req_type == 'get':
-        return arrgmts.Arrangement.req_get(
-            request.values, Path(app.config['PERFORMANCE_ANALYSIS_STORAGE']))
-    elif req_type == 'list':
-        return arrgmts.Arrangement.req_list(request.values)
-    else:
-        return '', 401
+    req_type = vals['type']
+    db_url = app.config.get('DATABASE_URL', None)
+    db_pass = app.config.get('DATABASE_PASSWORD', None)
+
+    with arrgmts.Context(db_url, db_pass) as cxt:
+        if req_type == 'check_name':
+            if 'name' not in vals or vals['name'] is None:
+                # This indicates that a random name will
+                # be used, so we can return False here.
+                return json.dumps({
+                    'exists': False
+                })
+
+            return json.dumps({
+                'exists': cxt.check_name(vals['name'])
+            }), 200
+        elif req_type == 'save':
+            if 'data' not in vals:
+                return '', 400
+
+            try:
+                if 'name' not in vals or vals['name'] is None:
+                    while True:
+                        name = friendly_names.generate(separator=' ')
+
+                        try:
+                            identifier, token = cxt.save(
+                                name, vals['data'],
+                                Path(app.config[
+                                    'PERFORMANCE_ANALYSIS_STORAGE']))
+                            break
+                        except FileExistsError:
+                            pass
+
+                    return json.dumps({
+                        'id': identifier,
+                        'name': name,
+                        'token': token
+                    }), 200
+                else:
+                    identifier, token = cxt.save(
+                        vals['name'], vals['data'],
+                        Path(app.config['PERFORMANCE_ANALYSIS_STORAGE']))
+
+                    return json.dumps({
+                        'id': identifier,
+                        'token': token
+                    }), 200
+            except FileExistsError:
+                return '', 409
+        elif req_type == 'edit_name':
+            if 'name' not in vals or \
+               'new_name' not in vals:
+                return '', 400
+
+            if 'token' not in vals:
+                return '', 403
+
+            try:
+                cxt.edit_name(vals['name'], vals['new_name'],
+                              vals['token'])
+                return '{}', 200
+            except FileExistsError:
+                return '', 409
+            except FileNotFoundError:
+                return '', 404
+            except PermissionError:
+                return '', 403
+        elif req_type == 'delete':
+            if 'name' not in vals:
+                return '', 400
+
+            if 'token' not in vals:
+                return '', 403
+
+            try:
+                cxt.delete(vals['name'], vals['token'])
+                return '{}', 200
+            except FileNotFoundError:
+                return '', 404
+            except PermissionError:
+                return '', 403
+        elif req_type == 'get':
+            if ('id' not in vals and 'name' not in vals) or \
+               ('id' in vals and 'name' in vals):
+                return '', 400
+
+            storage_path = Path(app.config['PERFORMANCE_ANALYSIS_STORAGE'])
+
+            try:
+                if 'id' in vals:
+                    data = cxt.get_by_id(vals['id'], storage_path)
+                else:
+                    data = cxt.get_by_name(vals['name'], storage_path)
+
+                return data, 200
+            except FileNotFoundError:
+                return '', 404
+            except ValueError as e:
+                return json.dumps({
+                    'session_invalid': str(e)
+                }), 422
+        elif req_type == 'list':
+            try:
+                cnt, pages, lst = cxt.get_list(vals.get('search', None),
+                                               vals.get('limit', 10),
+                                               vals.get('page', 1),
+                                               vals.get('sort', 'last_update_desc'),
+                                               vals.get('types', 'both'))
+
+                return json.dumps({
+                    'general_total_cnt': cnt,
+                    'general_total_pages': pages,
+                    'list': lst
+                }), 200
+            except ValueError:
+                return '', 400
+        else:
+            return '', 400
 
 
 @app.get('/')
@@ -124,7 +242,7 @@ def main():
     else:
         background = 'gray'
 
-    ids = PerformanceAnalysisResults.get_all_folders(
+    ids = Session.get_all_sessions(
         app.config['PERFORMANCE_ANALYSIS_STORAGE'])
 
     arrgmt = request.values.get('arrgmt', None)

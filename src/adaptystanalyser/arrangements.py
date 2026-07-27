@@ -12,8 +12,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-class Base(orm.DeclarativeBase):
-    def initialize(url=None, password=None):
+class Context:
+    """
+    A class managing connections to a database storing window arrangements.
+    """
+
+    def __init__(self, url=None, password=None):
+        """
+        Construct a Context object and initialise the database connection.
+
+        The default database is an SQLite one, stored at
+        ``~/.adaptyst_analyser/db.sqlite`` and created automatically
+        if not existing yet.
+
+        :param str url: The database URL to use. Use the SQLAlchemy syntax.
+        :param str password: The database password.
+        """
         if url is None:
             p = Path.home() / '.adaptyst_analyser'
             p.mkdir(exist_ok=True)
@@ -26,51 +40,79 @@ class Base(orm.DeclarativeBase):
             database_url = sqlalchemy.engine.make_url(url)
 
             if password is not None:
-                database_url.password = password
+                database_url = database_url.set(password=password)
 
-        Base._engine = sql.create_engine(database_url, echo=True)
-        Base.metadata.create_all(Base._engine)
+        self._engine = sql.create_engine(database_url)
+        Base.metadata.create_all(self._engine)
 
+    def __enter__(self):
+        return self
 
-class Arrangement(Base):
-    def req_check_name(data):
-        if 'name' not in data:
-            return '', 401
+    def __exit__(self, exception_type, exception_value,
+                 exception_traceback):
+        if not self.is_closed():
+            self.close()
 
-        with orm.Session(Base._engine) as session:
+        return False
+
+    def is_closed(self):
+        """
+        Return whether the database context has been closed.
+        """
+        return self._engine is None
+
+    def close(self):
+        """
+        Close the context.
+        """
+        self._engine.dispose()
+        self._engine = None
+
+    def check_name(self, name: str) -> bool:
+        """
+        Return whether an arrangement with a given name exists.
+
+        :param str name: The arrangement name to check.
+        """
+        with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(
-                    Arrangement.name == data['name']))
+                    Arrangement.name == name))
 
-            return json.dumps({
-                'exists': results.first() is not None
-            }), 200
+            return results.first() is not None
 
-    def req_save(data, storage_path: Path):
-        if 'name' not in data or \
-           'data' not in data:
-            return '', 401
+    def save(self, name: str, data: str, storage_path: Path) \
+            -> (str, str):
+        """
+        Save a new window arrangement in the database and returns
+        a tuple (<arrangement identifier>, <arrangement update token>).
 
-        with orm.Session(Base._engine) as session:
+        :param str name: The name of the arrangement.
+        :param str data: The JSON data describing the arrangement.
+        :param pathlib.Path storage_path: The parent path of referenced
+                                          performance analysis sessions.
+        :raises FileExistsError: When an arrangement with the given name exists.
+        """
+        with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(
-                    Arrangement.name == data['name']))
+                    Arrangement.name == name))
             arrgmt = results.first()
 
             if arrgmt is not None:
-                return '', 409
+                raise FileExistsError
 
-            data_decoded = json.loads(data['data'])
+            data_decoded = json.loads(data)
             if 'main_window' in data_decoded:
                 a_type = 'SW'
             else:
                 a_type = 'W'
 
-            arrgmt = Arrangement(name=data['name'],
+            arrgmt = Arrangement(name=name,
                                  a_type=a_type,
                                  last_update=datetime.now(
                                      timezone.utc),
-                                 data=data['data'])
+                                 data=data)
             token_to_return = arrgmt.gen_token()
             session.add(arrgmt)
             session.commit()
@@ -91,13 +133,13 @@ class Arrangement(Base):
 
                 if 'main_window' in data_decoded:
                     add_session(data_decoded['main_window'].get(
-                        'constr', [None])[0])
+                        'session', None))
 
                     for w in data_decoded.get('other_windows', {}).values():
-                        add_session(w.get('constr', [None])[0])
+                        add_session(w.get('session', None))
                 else:
                     for w in data_decoded.get('windows', {}).values():
-                        add_session(w.get('constr', [None])[0])
+                        add_session(w.get('session', None))
 
                 session.commit()
             except Exception as e:
@@ -106,62 +148,62 @@ class Arrangement(Base):
                 session.commit()
                 raise e
 
-            return json.dumps({
-                'id': arrgmt.a_id,
-                'token': token_to_return
-            }), 200
+            return arrgmt.a_id, token_to_return
 
-    def req_edit_name(data):
-        if 'name' not in data or \
-           'new_name' not in data:
-            return '', 401
+    def edit_name(self, name: str, new_name: str, token: str):
+        """
+        Rename a saved arrangement.
 
-        if 'token' not in data:
-            return '', 403
-
-        with orm.Session(Base._engine) as session:
+        :param str name: The current arrangement name.
+        :param str new_name: The new arrangement name.
+        :param str token: The update token for the arrangement.
+        :raises FileExistsError: When the new name is already in use.
+        :raises FileNotFoundError: When the arrangement does not exist.
+        :raises PermissionError: When the update token is invalid.
+        """
+        with orm.Session(self._engine) as session:
             results_new_name_check = session.scalars(
                 sql.select(Arrangement).where(
-                    Arrangement.name == data['new_name']))
+                    Arrangement.name == new_name))
 
             if results_new_name_check.first() is not None:
-                return '', 409
+                raise FileExistsError
 
             results = session.scalars(
                 sql.select(Arrangement).where(
-                    Arrangement.name == data['name']))
+                    Arrangement.name == name))
             arrgmt = results.first()
 
             if arrgmt is None:
-                return '', 404
+                raise FileNotFoundError
 
-            if not arrgmt.check_token(data['token']):
-                return '', 403
+            if not arrgmt.check_token(token):
+                raise PermissionError
 
-            arrgmt.name = data['new_name']
+            arrgmt.name = new_name
             arrgmt.last_update = datetime.now(timezone.utc)
             session.commit()
 
-            return '{}', 200
+    def delete(self, name, token):
+        """
+        Delete a saved arrangement.
 
-    def req_delete(data):
-        if 'name' not in data:
-            return '', 401
-
-        if 'token' not in data:
-            return '', 403
-
-        with orm.Session(Base._engine) as session:
+        :param str name: The arrangement name.
+        :param str token: The update token for the arrangement.
+        :raises FileNotFoundError: When the arrangement does not exist.
+        :raises PermissionError: When the update token is invalid.
+        """
+        with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(
-                    Arrangement.name == data['name']))
+                    Arrangement.name == name))
             arrgmt = results.first()
 
             if arrgmt is None:
-                return '', 404
+                raise FileNotFoundError
 
-            if not arrgmt.check_token(data['token']):
-                return '', 403
+            if not arrgmt.check_token(token):
+                raise PermissionError
 
             session.execute(sql.delete(Session).where(
                 Session.a_id == arrgmt.a_id))
@@ -169,54 +211,91 @@ class Arrangement(Base):
             session.delete(arrgmt)
             session.commit()
 
-            return '{}', 200
+    def _get(self, session, results, storage_path):
+        arrgmt = results.first()
 
-    def req_get(data, storage_path: Path):
-        if ('name' not in data and 'id' not in data) or \
-           ('name' in data and 'id' in data):
-            return '', 401
+        if arrgmt is None:
+            raise FileNotFoundError
 
-        with orm.Session(Base._engine) as session:
-            if 'id' in data:
-                results = session.scalars(
-                    sql.select(Arrangement).where(
-                        Arrangement.a_id == data['id']))
-            else:
-                results = session.scalars(
-                    sql.select(Arrangement).where(
-                        Arrangement.name == data['name']))
+        perf_session_results = session.scalars(
+            sql.select(Session).where(
+                Session.a_id == arrgmt.a_id))
 
-            arrgmt = results.first()
+        for perf_session in perf_session_results:
+            if not perf_session.check_fingerprint(storage_path):
+                raise ValueError(perf_session.name)
 
-            if arrgmt is None:
-                return '', 404
+        return arrgmt.data
 
-            perf_session_results = session.scalars(
-                sql.select(Session).where(
-                    Session.a_id == arrgmt.a_id))
+    def get_by_id(self, identifier, storage_path):
+        """
+        Return saved arrangement data by identifier.
 
-            for perf_session in perf_session_results:
-                if not perf_session.check_fingerprint(storage_path):
-                    return json.dumps({
-                        'session_invalid': perf_session.name
-                        }), 422
+        :param int identifier: The arrangement identifier.
+        :param pathlib.Path storage_path: The parent path of
+                                          performance analysis sessions
+                                          referenced by the arrangement.
+        :raises FileNotFoundError: When the arrangement does not exist.
+        :raises ValueError: When a referenced session has changed or is
+                            unavailable.
+        """
+        with orm.Session(self._engine) as session:
+            return self._get(session,
+                             session.scalars(
+                                 sql.select(Arrangement).where(
+                                     Arrangement.a_id == identifier)),
+                             storage_path)
 
-            return arrgmt.data, 200
+    def get_by_name(self, name, storage_path):
+        """
+        Return saved arrangement data by name.
 
-    def req_list(data):
-        limit = data.get('limit', 10)
-        page = data.get('page', 1)
-        sort = data.get('sort', 'last_update_desc')
-        types = data.get('types', 'both')
+        :param str name: The arrangement name.
+        :param pathlib.Path storage_path: The parent path of
+                                          performance analysis sessions
+                                          referenced by the arrangement.
+        :raises FileNotFoundError: When the arrangement does not exist.
+        :raises ValueError: When a referenced session has changed or is
+                            unavailable.
+        """
+        with orm.Session(self._engine) as session:
+            return self._get(session,
+                             session.scalars(
+                                 sql.select(Arrangement).where(
+                                     Arrangement.name == name)),
+                             storage_path)
 
+    def get_list(self, search, limit, page, sort, types):
+        """
+        Queries the saved arrangements and returns information
+        necessary for displaying the query results with pagination:
+        a tuple (<number of all arrangements matching the query>,
+        <total number of arrangement pages matching the query>,
+        <list of arrangements in form of dictionaries obtained by
+        Arrangement.to_dict()>).
+
+        :param str search: A regular expression used to filter names.
+                           Use None if you don't want to filter names.
+        :param limit: The maximum number of arrangements to return at once.
+        :param page: Number indicating what page of the query results
+                     should be returned.
+        :param str sort: The query result sorting method. Use one of
+                         "last_update_desc", "last_update_asc", "name_desc",
+                         and "name_asc".
+        :param str types: The arrangement type to display. Use one of
+                          "W" (window arrangements), "SW" (single window
+                          arrangements), and "both".
+        :raises ValueError: When the value of "limit", "page", "sort",
+                            and/or "types" is invalid.
+        """
         try:
             limit = int(limit)
             page = int(page)
         except Exception:
-            return '', 401
+            raise ValueError
 
         if page < 1:
-            return '', 401
+            raise ValueError
 
         if sort == 'last_update_desc':
             order_by = sql.desc(Arrangement.last_update)
@@ -227,7 +306,7 @@ class Arrangement(Base):
         elif sort == 'name_asc':
             order_by = sql.asc(Arrangement.name)
         else:
-            return '', 401
+            raise ValueError
 
         if types == 'both':
             where = [True]
@@ -236,24 +315,32 @@ class Arrangement(Base):
         elif types == 'SW':
             where = [Arrangement.a_type == 'SW']
         else:
-            return '', 401
+            raise ValueError
 
-        if 'search' in data:
-            where.append(Arrangement.name.regexp_match(data['search']))
+        if search is not None:
+            where.append(Arrangement.name.regexp_match(search))
 
-        with orm.Session(Base._engine) as session:
+        with orm.Session(self._engine) as session:
             results = session.scalars(
                 sql.select(Arrangement).where(*where).order_by(
                     order_by).limit(limit).offset((page - 1) * limit))
             cnt = session.query(
                 sql.func.count(Arrangement.a_id)).where(*where).scalar()
 
-            return json.dumps({
-                'general_total_cnt': cnt,
-                'general_total_pages': max(1, (cnt // limit) +
-                                           (1 if cnt % limit > 0 else 0)),
-                'list': list(map(Arrangement.to_dict, results))
-            }), 200
+            return cnt, max(1, (cnt // limit) +
+                            (1 if cnt % limit > 0 else 0)), \
+                list(map(Arrangement.to_dict, results))
+
+
+class Base(orm.DeclarativeBase):
+    pass
+
+
+class Arrangement(Base):
+    """
+    A class describing a saved window arrangement, using
+    SQLAlchemy ORM.
+    """
 
     __tablename__ = 'arrangement'
 
@@ -266,6 +353,9 @@ class Arrangement(Base):
     data: orm.Mapped[str]
 
     def gen_token(self):
+        """
+        Generate, store, and return an update token for the arrangement.
+        """
         token_to_return = os.urandom(32).hex()
         self.token_salt = os.urandom(32)
         self.token = hashlib.pbkdf2_hmac('sha256',
@@ -275,6 +365,11 @@ class Arrangement(Base):
         return token_to_return
 
     def check_token(self, user_token):
+        """
+        Return whether a given update token is valid for the arrangement.
+
+        :param str user_token: The update token to validate.
+        """
         hashed_token = hashlib.pbkdf2_hmac('sha256',
                                            user_token.encode('utf-8'),
                                            self.token_salt,
@@ -282,6 +377,9 @@ class Arrangement(Base):
         return hashed_token == self.token
 
     def to_dict(self):
+        """
+        Return the public metadata of the arrangement as a dictionary.
+        """
         return {
             'id': self.a_id,
             'name': self.name,
@@ -294,6 +392,11 @@ class Arrangement(Base):
 
 
 class Session(Base):
+    """
+    A class representing a performance analysis session that can
+    be linked to one or more arrangements. This uses SQLAlchemy ORM.
+    """
+
     __tablename__ = 'session'
 
     a_id: orm.Mapped[int] = orm.mapped_column(
@@ -304,6 +407,13 @@ class Session(Base):
     last_update_or_successful_check: orm.Mapped[datetime]
 
     def gen_fingerprint(self, storage_path: Path):
+        """
+        Generate and store a fingerprint of the session, based on its
+        directory contents. Nothing is returned.
+
+        :param pathlib.Path storage_path: The parent path of the session.
+        :raises FileNotFoundError: When the session directory does not exist.
+        """
         p = storage_path / self.name
         if not p.exists():
             raise FileNotFoundError(str(p))
@@ -313,6 +423,15 @@ class Session(Base):
             datetime.now(timezone.utc)
 
     def check_fingerprint(self, storage_path: Path):
+        """
+        Return whether the linked session directory matches the fingerprint
+        stored in the object.
+
+        If the check succeeds, the last successful check time is refreshed
+        accordingly.
+
+        :param pathlib.Path storage_path: The parent path of the session.
+        """
         p = storage_path / self.name
         if not p.exists():
             return False

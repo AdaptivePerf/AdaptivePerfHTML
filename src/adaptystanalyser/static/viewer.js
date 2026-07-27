@@ -63,7 +63,7 @@ class Session {
         }
 
         $.ajax({
-            url: this.id + '/' + entity + '/' + node + '/' + module,
+            url: 'process/' + this.id + '/' + entity + '/' + node + '/' + module,
             method: 'POST',
             dataType: content_type,
             data: data
@@ -209,43 +209,44 @@ class Window {
         let createWindow = window_class => {
             let session = undefined;
 
-            if (obj.constr[0] != undefined) {
-                if (obj.constr[0] in Session.instances) {
-                    session = Session.instances[obj.constr[0]];
+            if (obj.session != undefined) {
+                if (obj.session in Session.instances) {
+                    session = Session.instances[obj.session];
                 } else {
                     session =
-                        new Session(obj.constr[0],
+                        new Session(obj.session,
                                     $('#results_combobox').find(
-                                        'option[value="' + obj.constr[0] + '"]').attr(
+                                        'option[value="' + obj.session + '"]').attr(
                                             'data-label'));
                 }
             }
 
-            new window_class(session,
-                             obj.constr[1],
-                             obj.constr[2],
-                             obj.constr[3],
-                             obj.constr[4],
-                             obj.constr[5],
-                             obj.constr[6],
-                             obj.dependencies,
-                             obj.id, obj.width,
-                             obj.height,
-                             w => {
-                                 if (obj.data != undefined) {
-                                     w._importData(obj.data);
-                                 }
+            let window_obj = new window_class(true, ...obj.constr);
+            window_obj.init(window_obj, session,
+                            obj.entity,
+                            obj.analysable,
+                            obj.module,
+                            obj.init_data,
+                            obj.x,
+                            obj.y,
+                            obj.dependencies,
+                            obj.id, obj.width,
+                            obj.height,
+                            w => {
+                                if (obj.data != undefined) {
+                                    w._importData(obj.data);
+                                }
 
-                                 w.#editTitle(obj.custom_title);
+                                w.#editTitle(obj.custom_title);
 
-                                 if (obj.collapsed && !Window.isInCompactMode()) {
-                                     w.onVisibilityClick();
-                                 }
+                                if (obj.collapsed && !Window.isInCompactMode()) {
+                                    w.onVisibilityClick();
+                                }
 
-                                 if (ready_handler != undefined) {
-                                     ready_handler();
-                                 }
-                             });
+                                if (ready_handler != undefined) {
+                                    ready_handler();
+                                }
+                            });
         };
 
         if (obj.module == undefined) {
@@ -299,7 +300,7 @@ class Window {
     #id;
     #session;
     #entity_id;
-    #node_id;
+    #analysable_id;
     #data;
     #module_name;
     #being_resized;
@@ -316,11 +317,15 @@ class Window {
     #window_dependencies;
     #constructor_data;
     #ready_handler;
+    #centered;
 
     /**
      *  Constructs a Window object. This doesn't do anything
      *  else, including displaying a window: you need to call
-     *  `init()` for this.
+     *  `init()` for this unless the window is deserialized
+     *  (i.e. created by Window.deserialize(), this will
+     *  be indicated by the first argument to the subclass
+     *  constructor set to true).
      *
      *  @constructor
      */
@@ -334,6 +339,10 @@ class Window {
      *  be called by all subclasses from their constructor,
      *  with the first argument being JavaScript "this".
      *
+     *  The method should not be overridden: otherwise,
+     *  the serialising/deserialising feature won't work
+     *  properly if at all.
+     *
      *  @param {Object} [instance] A Window subclass object
      *  referred to by JavaScript "this" inside the subclass
      *  constructor.
@@ -343,7 +352,7 @@ class Window {
      *  @param {String} [entity_id] The ID of an entity corresponding
      *  to a window. This is provided by a parameter of
      *  `createRootWindow()`. It can be undefined.
-     *  @param {String} [node_id] The ID of a node corresponding
+     *  @param {String} [analysable_id] The ID of an analysable corresponding
      *  to a window. This is provided by a parameter of
      *  `createRootWindow()`. It can be undefined.
      *  @param {String} [module_name] The name of a module within
@@ -379,7 +388,7 @@ class Window {
      *  corresponding to the loaded Window subclass object and no return value.
      *  This is not run if an error occurs. It can be undefined.
      */
-    init(instance, session, entity_id, node_id,
+    init(instance, session, entity_id, analysable_id,
          module_name, data, x, y,
          window_dependencies, custom_id,
          width, height, ready_handler) {
@@ -411,7 +420,7 @@ class Window {
         this.#id = id;
         this.#session = session;
         this.#entity_id = entity_id;
-        this.#node_id = node_id;
+        this.#analysable_id = analysable_id;
         this.#data = {};
         this.#constructor_data = data;
         this.#module_name = module_name;
@@ -445,11 +454,15 @@ class Window {
             if (x != undefined && y != undefined) {
                 this.#dom.css('left', x + 'px');
                 this.#dom.css('top', y + 'px');
+                this.#centered = false;
             } else {
                 this.#dom.css('top', '50%');
                 this.#dom.css('left', '50%');
                 this.#dom.css('transform', 'translate(-50%, -50%)');
+                this.#centered = true;
             }
+        } else {
+            this.#centered = false;
         }
 
         this.#first_resize_call = true;
@@ -502,7 +515,7 @@ class Window {
      */
     sendRequest(data, done_func, fail_func, content_type) {
         this.getSession().sendRequest(this.getEntityId(),
-                                      this.getNodeId(),
+                                      this.getAnalysableId(),
                                       this.getModuleName(),
                                       data, done_func, fail_func,
                                       content_type);
@@ -539,13 +552,13 @@ class Window {
     }
 
     /**
-     *  Gets the node ID of a window. It can be
+     *  Gets the ID of the analysable of a window. It can be
      *  undefined.
      *
-     *  @return {String} Node ID of a window.
+     *  @return {String} ID of the analysable of a window.
      */
-    getNodeId() {
-        return this.#node_id;
+    getAnalysableId() {
+        return this.#analysable_id;
     }
 
     /**
@@ -796,13 +809,15 @@ class Window {
                     "the session formally associated with the " +
                     "window/tab if any.\n\n" +
                     "The window/tab content is also saved if the content export is supported by a corresponding module.\n\n" +
-                    "What name would you like to give to your arrangement? It must not be empty.");
+                    "What name would you like to give to your arrangement? Leave it empty to get a random human-friendly name.");
         };
 
         let name = getName();
 
-        if (name == undefined || name === "") {
+        if (name == undefined) {
             return;
+        } else if (name === '') {
+            name = undefined;
         }
 
         this.#dom.find('.window_share').addClass('disabled');
@@ -852,7 +867,7 @@ class Window {
             });
 
             for (const w of instances) {
-                windows[w.getId()] = w.serialize(cur_x, cur_y);
+                windows[w.getId()] = w.serialize(cur_x, cur_y, true);
 
                 cur_x += 20;
                 cur_y += 20;
@@ -869,6 +884,10 @@ class Window {
                 'name': name,
                 'data': JSON.stringify(arrangement)
             }, (data, status) => {
+                if (name == undefined) {
+                    name = data.name;
+                }
+
                 window.prompt('The arrangement "' + name + '" has been ' +
                               'saved successfully!\n\n' +
                               "Here's the auth token for changing the " +
@@ -880,7 +899,7 @@ class Window {
                 this.#dom.find('.window_share').attr('onclick', `Window.instances['${this.#id}'].onShareClick(event)`);
                 this.hideLoading();
 
-                new LinkWindow(undefined, undefined, undefined, undefined, {
+                new LinkWindow(false, undefined, undefined, undefined, undefined, {
                     'arrgmt': data.id,
                     'name': name,
                     'compact': true,
@@ -1127,6 +1146,7 @@ class Window {
             let newY = event.pageY - startY;
             let dragged_rect = dragged.getBoundingClientRect();
 
+            this.#centered = false;
             dragged.style.transform = '';
             dragged.style.left = newX + 'px';
             dragged.style.top = newY + 'px';
@@ -1326,6 +1346,8 @@ class Window {
      *  This method returns an empty array if no window dependencies
      *  have been provided in the constructor.
      *
+     *  undefined should never be returned.
+     *
      *  @return {Array} Array of window dependencies in form of ID strings.
      */
     getDependencies() {
@@ -1366,14 +1388,20 @@ class Window {
      *  The return format is a JSON-able dictionary in the following form:
      *  ```
      *  {
-     *    "id": <window ID>,
-     *    "module": <module name>,
-     *    "type": <window type>,
-     *    "constr": <array of arguments to be passed to the window constructor>,
-     *    "dependencies": <window dependencies as returned by getDependencies()>,
-     *    "collapsed": <whether the window is collapsed>,
-     *    "custom_title": <custom title if any, may be omitted>,
-     *    "data": <window data returned by _exportData(), may be omitted>
+     *    "id": <window ID: always present>,
+     *    "module": <module name: not always present>,
+     *    "type": <window type: always present>,
+     *    "constr": <array of arguments to be passed to the window constructor: always present>,
+     *    "session": <session ID: not always present>,
+     *    "entity": <entity ID: not always present>,
+     *    "analysable": <ID of analysable: not always present>,
+     *    "init_data": <arbitrary data passed to _setup() and getTitle(): not always present>,
+     *    "x": <x-part of the initial upper-left corner position of the window: not always present>,
+     *    "y": <y-part of the initial upper-left corner position of the window: not always present>,
+     *    "dependencies": <window dependencies as returned by getDependencies(): always present>,
+     *    "collapsed": <whether the window is collapsed: always present>,
+     *    "custom_title": <custom title if any: not always present>,
+     *    "data": <window data returned by _exportData(): not always present>
      *  }
      *  ```
      *
@@ -1382,30 +1410,32 @@ class Window {
      *
      *  @param {int} [x] x-part of the initial upper-left corner position
      *  of the window in case it cannot be extracted automatically (e.g.
-     *  due to being in the compact mode).
+     *  due to being in the compact mode). If undefined, the window will
+     *  be centered in a screen when deserialised unless the coordinate
+     *  can be obtained automatically.
      *  @param {int} [y] y-part of the initial upper-left corner position
      *  of the window in case it cannot be extracted automatically (e.g.
-     *  due to being in the compact mode).
+     *  due to being in the compact mode). If undefined, the window will
+     *  be centered in a screen when deserialised unless the coordinate
+     *  can be obtained automatically.
+     *  @param {bool} [collapsed] Whether the window should be serialised
+     *  in the collapsed state. If undefined, the current collapsed status
+     *  will be used instead (which is always false if the compact mode is on).
      *  @return Window serialised in form of a JSON-able dictionary.
      */
-    serialize(x, y) {
-        if (x == undefined) {
-            console.error('serialize(): x cannot be null/undefined!');
-            return undefined;
-        }
-
-        if (y == undefined) {
-            console.error('serialize(): y cannot be null/undefined!');
-            return undefined;
-        }
-
+    serialize(x, y, collapsed) {
         if (!Window.isInCompactMode()) {
-            let x_tmp = Number.parseFloat(this.#dom.css('left'));
-            let y_tmp = Number.parseFloat(this.#dom.css('top'));
+            if (this.#centered) {
+                x = undefined;
+                y = undefined;
+            } else {
+                let x_tmp = Number.parseFloat(this.#dom.css('left'));
+                let y_tmp = Number.parseFloat(this.#dom.css('top'));
 
-            if (!isNaN(x_tmp) && !isNaN(y_tmp)) {
-                x = x_tmp;
-                y = y_tmp;
+                if (!isNaN(x_tmp) && !isNaN(y_tmp)) {
+                    x = x_tmp;
+                    y = y_tmp;
+                }
             }
         }
 
@@ -1413,20 +1443,36 @@ class Window {
             "id": this.#id,
             "module": this.#module_name,
             "type": this.getType(),
-            "constr": [this.#session != undefined ? this.#session.id : undefined,
-                       this.#entity_id,
-                       this.#node_id,
-                       this.#module_name,
-                       this.#constructor_data,
-                       x, y],
+            "constr": this.getConstructorArgs(),
+            "session": this.#session != undefined ? this.#session.id : undefined,
+            "entity": this.#entity_id,
+            "analysable": this.#analysable_id,
+            "init_data": this.#constructor_data,
+            "x": x,
+            "y": y,
             "dependencies": this.getDependencies(),
-            "collapsed": this.#collapsed,
+            "collapsed": collapsed != undefined ? collapsed : (
+                Window.isInCompactMode() ? false : this.#collapsed),
             "custom_title": this.#custom_title,
             "data": this._exportData(),
             "width": Window.isInCompactMode() ? undefined : this.#dom.outerWidth(),
             "height": Window.isInCompactMode() ? undefined :
                 (this.#collapsed ? this.#last_height : this.#dom.outerHeight())
         };
+    }
+
+    /**
+     *  Gets the array of arguments passed to the constructor (not init()) except for
+     *  the first argument indicating whether the window is being deserialised. This is
+     *  useful for serialising/deserialising a window.
+     *
+     *  The default implementation returns an empty array. undefined should
+     *  never be returned.
+     *
+     *  @return Array of constructor arguments, starting from the second one.
+     */
+    getConstructorArgs() {
+        return [];
     }
 
     /**
@@ -1751,9 +1797,12 @@ class Menu {
 
 // Private, not meant to be used by any external code.
 class LinkWindow extends Window {
-    constructor(...args) {
+    constructor(deserialized, ...args) {
         super();
-        this.init(this, ...args);
+
+        if (!deserialized) {
+            this.init(this, ...args);
+        }
     }
 
     getType() {
@@ -1933,9 +1982,12 @@ class LinkWindow extends Window {
 class SettingsWindow extends Window {
     #current_backend;
 
-    constructor(...args) {
+    constructor(deserialized, ...args) {
         super();
-        this.init(this, ...args);
+
+        if (!deserialized) {
+            this.init(this, ...args);
+        }
     }
 
     getType() {
@@ -2053,9 +2105,12 @@ class OpenArrangementWindow extends Window {
     #page
     #last_page
 
-    constructor(...args) {
+    constructor(deserialized, ...args) {
         super();
-        this.init(this, ...args);
+
+        if (!deserialized) {
+            this.init(this, ...args);
+        }
     }
 
     getType() {
@@ -2417,7 +2472,7 @@ class OpenArrangementWindow extends Window {
 
     onGetLinkClick(event, arrgmt) {
         Window.stopPropagation(event);
-        new LinkWindow(undefined, undefined, undefined, undefined, {
+        new LinkWindow(false, undefined, undefined, undefined, undefined, {
             'arrgmt': arrgmt.id,
             'name': arrgmt.name,
             'compact': arrgmt.type === 'SW',
@@ -2718,7 +2773,7 @@ function loadCurrentSession(ready_handler) {
         let min_mod_vers = JSON.parse($('#viewer_script').attr('data-min-mod-vers'));
 
         $.ajax({
-            url: id + '/',
+            url: 'get/' + id + '/',
             method: 'GET'
         }).done(ajax_obj => {
             let response = JSON.parse(ajax_obj);
@@ -2888,12 +2943,12 @@ function loadCurrentSession(ready_handler) {
 
 // Private, not meant to be called by any external code.
 function onOpenClick(event) {
-    new OpenArrangementWindow(undefined, undefined, undefined, undefined, {});
+    new OpenArrangementWindow(false, undefined, undefined, undefined, undefined, {});
 }
 
 // Private, not meant to be called by any external code.
 function openSessionLinkDialogs() {
-    new LinkWindow(undefined, undefined, undefined, undefined, {
+    new LinkWindow(false, undefined, undefined, undefined, undefined, {
         'session': $('#results_combobox option:selected').attr('value'),
         'compact': false
     });
@@ -2933,13 +2988,15 @@ function saveWindowArrangement() {
                 "A window arrangement is defined as your current session choice, the camera state of the system graph, " +
                 "and all of your windows/tabs " +
                 "along with their content if the content export is supported by a corresponding module.\n\n" +
-                "What name would you like to give to your arrangement? It must not be empty.");
+                "What name would you like to give to your arrangement? Leave it empty to get a random human-friendly name.");
     };
 
     let name = getName();
 
-    if (name == undefined || name === "") {
+    if (name == undefined) {
         return;
+    } else if (name === '') {
+        name = undefined;
     }
 
     $('#share').removeClass('pointer');
@@ -2989,6 +3046,10 @@ function saveWindowArrangement() {
             'name': name,
             'data': JSON.stringify(arrangement)
         }, (data, status) => {
+            if (name == undefined) {
+                name = data.name;
+            }
+
             window.prompt('The arrangement "' + name + '" has been ' +
                           'saved successfully!\n\n' +
                           "Here's the auth token for changing the " +
@@ -3001,7 +3062,7 @@ function saveWindowArrangement() {
             $('#share').attr('onclick', 'onShareClick(event)');
             $('html').css('cursor', '');
 
-            new LinkWindow(undefined, undefined, undefined, undefined, {
+            new LinkWindow(false, undefined, undefined, undefined, undefined, {
                 'arrgmt': data.id,
                 'name': name
             });
@@ -3128,7 +3189,7 @@ function onSessionRefreshClick(event) {
 
 // Private, not meant to be called by any external code.
 function onSettingsClick(event) {
-    new SettingsWindow(undefined, undefined, undefined, undefined, {});
+    new SettingsWindow(false, undefined, undefined, undefined, undefined, {});
 }
 
 // Private, not meant to be called by any external code.
@@ -3237,6 +3298,8 @@ $(document).ready(() => {
                             Math.max(0, $('#tabs').prop('scrollLeft') + coefficient * event.deltaY));
         });
     } else {
-        $(document).on('change', '#results_combobox', loadCurrentSession);
+        $(document).on('change', '#results_combobox', () => {
+            loadCurrentSession();
+        });
     }
 });

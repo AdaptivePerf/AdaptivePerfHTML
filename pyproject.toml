@@ -19,6 +19,7 @@ dependencies = [
   "flask",
   "gunicorn",
   "SQLAlchemy",
+  "friendly_names",
   "paqpy",
   "pytest",
   "pytest-mock"
