@@ -129,7 +129,11 @@ def main():
             print(f'Downloading {name} from {url}...',
                   file=sys.stderr)
 
-            with urllib.request.urlopen(url) as data:
+            req = urllib.request.Request(url, headers={
+                'User-Agent': 'Mozilla/5.0 (Adaptyst Analyser)'
+            })
+
+            with urllib.request.urlopen(req) as data:
                 with (static_path / name).open(mode='wb') as f:
                     shutil.copyfileobj(data, f)
 
@@ -368,7 +372,11 @@ def main():
                           '.js, .cjs, nor .css', file=sys.stderr)
                     continue
 
-                with urllib.request.urlopen(url) as data:
+                req = urllib.request.Request(url, headers={
+                    'User-Agent': 'Mozilla/5.0 (Adaptyst Analyser)'
+                })
+
+                with urllib.request.urlopen(req) as data:
                     with NamedTemporaryFile(delete=False) as tf:
                         shutil.copyfileobj(data, tf)
                         tf_path = Path(tf.name)
@@ -463,7 +471,11 @@ def main():
                 print(f'Downloading {name} from {url}...',
                       file=sys.stderr)
 
-                with urllib.request.urlopen(url) as data:
+                req = urllib.request.Request(url, headers={
+                    'User-Agent': 'Mozilla/5.0 (Adaptyst Analyser)'
+                })
+
+                with urllib.request.urlopen(req) as data:
                     with (static_path / name).open(mode='wb') as f:
                         shutil.copyfileobj(data, f)
 
