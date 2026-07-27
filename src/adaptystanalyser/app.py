@@ -104,7 +104,7 @@ def arrgmt_post():
     vals = request.values
 
     if 'type' not in vals:
-        return '', 401
+        return '', 400
 
     req_type = vals['type']
     db_url = app.config.get('DATABASE_URL', None)
@@ -124,7 +124,7 @@ def arrgmt_post():
             }), 200
         elif req_type == 'save':
             if 'data' not in vals:
-                return '', 401
+                return '', 400
 
             try:
                 if 'name' not in vals or vals['name'] is None:
@@ -159,7 +159,7 @@ def arrgmt_post():
         elif req_type == 'edit_name':
             if 'name' not in vals or \
                'new_name' not in vals:
-                return '', 401
+                return '', 400
 
             if 'token' not in vals:
                 return '', 403
@@ -176,7 +176,7 @@ def arrgmt_post():
                 return '', 403
         elif req_type == 'delete':
             if 'name' not in vals:
-                return '', 401
+                return '', 400
 
             if 'token' not in vals:
                 return '', 403
@@ -191,7 +191,7 @@ def arrgmt_post():
         elif req_type == 'get':
             if ('id' not in vals and 'name' not in vals) or \
                ('id' in vals and 'name' in vals):
-                return '', 401
+                return '', 400
 
             storage_path = Path(app.config['PERFORMANCE_ANALYSIS_STORAGE'])
 
@@ -222,9 +222,9 @@ def arrgmt_post():
                     'list': lst
                 }), 200
             except ValueError:
-                return '', 401
+                return '', 400
         else:
-            return '', 401
+            return '', 400
 
 
 @app.get('/')
