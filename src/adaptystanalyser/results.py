@@ -1060,7 +1060,8 @@ class Window(ABC):
                          None, then a random human-friendly name is generated.
         :param Session session: Session associated with the arrangement.
         :param str db_url: Database URL to use. Use the SQLAlchemy syntax.
-        It can be None, a default SQLite database is used then.
+                           It can be None, a default SQLite database is used
+                           then.
         :param str db_pass: Database password to use. It can be None.
         :raises NotImplementedError: When the windows refer to sessions stored
                                      in more than one parent directory.
