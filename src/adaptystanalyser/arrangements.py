@@ -40,7 +40,7 @@ class Context:
             database_url = sqlalchemy.engine.make_url(url)
 
             if password is not None:
-                database_url.password = password
+                database_url = database_url.set(password=password)
 
         self._engine = sql.create_engine(database_url)
         Base.metadata.create_all(self._engine)
