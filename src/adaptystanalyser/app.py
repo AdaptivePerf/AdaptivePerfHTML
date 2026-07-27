@@ -21,6 +21,9 @@ if 'PERFORMANCE_ANALYSIS_STORAGE' not in app.config:
                        'variable to the absolute path to a directory where '
                        'Adaptyst performance analysis results are stored.')
 
+if 'BACKGROUND_CSS' in app.config and ';' in app.config.get('BACKGROUND_CSS'):
+    raise RuntimeError('Semicolons are not allowed in FLASK_BACKGROUND_CSS')
+
 
 static_path = Path(app.root_path) / 'static'
 scripts = ['jquery.min.js'] + \
