@@ -10,6 +10,8 @@ workflow:
 stages:
   - licensing-check
   - build
+  - docs
+  - docs-deploy
 
 reuse-lint:
   image:
@@ -17,7 +19,6 @@ reuse-lint:
     entrypoint: [""]
   stage: licensing-check
   script:
-    - cd $CI_PROJECT_DIR
     - reuse lint
 
 docker-build:
@@ -41,24 +42,53 @@ docker-build:
     # Print the full registry path of the pushed image
     - echo "Image pushed successfully to ${IMAGE_DESTINATION}"
 
-# docker-test:
-#   image:
-#     name: gitlab-registry.cern.ch/adaptyst/adaptyst-analyser:branch-$CI_COMMIT_BRANCH
-#     entrypoint: [""]
-#   rules:
-#     - if: $CI_COMMIT_TAG == null
-#   stage: test
-#   script:
-#     - cd $CI_PROJECT_DIR
-#     - pytest
+js-docs-gen:
+  image:
+    name: registry.cern.ch/docker.io/ubuntu:latest
+  stage: docs
+  before_script:
+    - apt-get update
+    - apt-get install -y nodejs
+    - npm install -g jsdoc
+  script:
+    - cd docs/javascript
+    - jsdoc -c config.json home.md ../../src/adaptystanalyser/static/viewer.js
+  artifacts:
+    paths:
+      - docs/javascript/out
+    expire_in: 6 h
 
-# docker-test-main:
-#   image:
-#     name: gitlab-registry.cern.ch/adaptyst/adaptyst-analyser:latest
-#     entrypoint: [""]
-#   rules:
-#     - if: $CI_COMMIT_TAG != null
-#   stage: test
-#   script:
-#     - cd $CI_PROJECT_DIR
-#     - pytest
+python-docs-gen:
+  image:
+    name: registry.cern.ch/docker.io/python:latest
+  stage: docs
+  before_script:
+    - pip install -U sphinx
+  script:
+    - sphinx-build -b html docs/python docs/python/_build
+  artifacts:
+    paths:
+      - docs/python/_build
+    expire_in: 6 h
+
+js-docs-deploy:
+  image:
+    name: gitlab-registry.cern.ch/ci-tools/ci-web-deployer:latest
+  stage: docs-deploy
+  rules:
+    - if: $CI_COMMIT_TAG != null
+  script:
+    - export EOS_PATH=$EOS_PATH_JS_DOCS
+    - mv docs/javascript/out public
+    - deploy-eos
+
+python-docs-deploy:
+  image:
+    name: gitlab-registry.cern.ch/ci-tools/ci-web-deployer:latest
+  stage: docs-deploy
+  rules:
+    - if: $CI_COMMIT_TAG != null
+  script:
+    - export EOS_PATH=$EOS_PATH_PYTHON_DOCS
+    - mv docs/python/_build public
+    - deploy-eos
