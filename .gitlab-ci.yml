@@ -71,7 +71,7 @@ python-docs-gen:
     - pip install -U sphinx
     - pip install $CI_PROJECT_DIR
   script:
-    - sphinx-build -b html docs/python docs/python/_build
+    - sphinx-build -W -b html docs/python docs/python/_build
   artifacts:
     paths:
       - docs/python/_build
