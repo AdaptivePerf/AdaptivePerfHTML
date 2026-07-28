@@ -228,7 +228,10 @@ class Module(ABC):
         <HTTP status code>)`` tuple or just response data (the
         200 HTTP status code is assumed then).
 
-        :param data: Data supplied in the POST request.
+        :param data: Data supplied in the POST request in form
+                     of a dictionary storing form fields (e.g.
+                     field ```xyz=abc``` is stored as
+                     ``data['xyz'] = 'abc'``.
         """
         pass
 
