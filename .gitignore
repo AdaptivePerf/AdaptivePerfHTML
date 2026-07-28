@@ -317,3 +317,10 @@ src/adaptystanalyser/static/modules
 src/adaptystanalyser/static/*.js
 src/adaptystanalyser/static/*.css
 src/adaptystanalyser/static/deps
+
+!src/adaptystanalyser/static/viewer_common.css
+!src/adaptystanalyser/static/viewer_standard.css
+!src/adaptystanalyser/static/viewer_compact.css
+!src/adaptystanalyser/static/viewer.js
+
+docs/python/_build

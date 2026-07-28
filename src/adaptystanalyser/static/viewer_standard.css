@@ -1,0 +1,62 @@
+/*
+SPDX-FileCopyrightText: 2026 CERN
+SPDX-License-Identifier: LGPL-3.0-or-later
+*/
+
+html {
+    overflow:visible;
+}
+
+#main {
+    height:90vh;
+    width:90vw;
+    max-height:90vh;
+    max-width:90vw;
+    box-shadow:3px 3px 10px;
+    border-style:solid;
+    border-color:black;
+    border-width:2px;
+}
+
+#footer {
+    min-height:2.5em;
+    font-size:18px;
+}
+
+.window_header {
+    display:flex;
+    align-items:center;
+    background-color:black;
+    color:white;
+    fill:white;
+    padding:5px;
+    cursor:grab;
+}
+
+.window_buttons {
+    display:flex;
+    align-items:center;
+}
+
+.window_refresh, .window_share,
+.window_visibility, .window_edit_title, .window_close {
+    min-width:24px;
+    margin-left:5px;
+}
+
+.window {
+    position:absolute;
+    display:flex;
+    flex-direction:column;
+    outline-style:solid;
+    outline-color:black;
+    outline-width:2px;
+    overflow:hidden;
+    resize:both;
+    box-shadow:3px 3px 10px;
+    max-height:95%;
+    max-width:95%;
+    min-width:250px;
+    min-height:50px;
+    box-sizing:border-box;
+}

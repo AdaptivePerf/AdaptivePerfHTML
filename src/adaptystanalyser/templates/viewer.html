@@ -4,13 +4,22 @@ SPDX-License-Identifier: LGPL-3.0-or-later
 -->
 
 <!DOCTYPE html>
-<html style="background:{{ background }}">
+<html style="background:{{ background }}" onclick="Menu.closeMenu()">
   <head>
     <title>{{ title }}</title>
     {% for script in scripts %}
     <script type="text/javascript"
             src="{{ url_for('static', filename=script) }}"></script>
     {% endfor %}
+    {% if compact %}
+    <link type="text/css" rel="stylesheet"
+          href="{{ url_for('static', filename='viewer_compact.css') }}" />
+    {% else %}
+    <link type="text/css" rel="stylesheet"
+          href="{{ url_for('static', filename='viewer_standard.css') }}" />
+    {% endif %}
+    <link type="text/css" rel="stylesheet"
+          href="{{ url_for('static', filename='viewer_common.css') }}" />
     {% for stylesheet in stylesheets %}
     <link type="text/css" rel="stylesheet"
           href="{{ url_for('static', filename=stylesheet) }}" />
@@ -18,8 +27,59 @@ SPDX-License-Identifier: LGPL-3.0-or-later
     <script type="text/javascript" id="viewer_script" data-min-mod-vers="{{ min_mod_vers }}"
             src="{{ url_for('static', filename='viewer.js') }}"></script>
   </head>
-  <body onclick="Menu.closeMenu()">
-    <div id="main">
+  {% if compact %}
+
+  {% if arrgmt %}
+  <body data-compact="1" data-arrgmt="{{ arrgmt }}">
+  {% elif session %}
+  <body data-compact="1" data-session="{{ session }}">
+  {% else %}
+  <body data-compact="1">
+  {% endif %}
+
+  {% elif arrgmt %}
+  <body data-arrgmt="{{ arrgmt }}">
+  {% elif session %}
+  <body data-session="{{ session }}">
+  {% else %}
+  <body>
+  {% endif %}
+
+  {% if arrgmt %}
+  <div id="arrgmt_loading" class="loading_no_flex">
+    <noscript>
+      <h2>You must have JavaScript enabled in order to use this page!</h2>
+    </noscript>
+    <h1>Adaptyst Analyser</h1>
+    <img class="loading_image" src="{{ url_for('static', filename='loading.svg') }}"
+         alt="Please wait..." title="Please wait..." width="64px" height="64px" />
+  </div>
+  {% endif %}
+
+  <div id="main">
+    {% if compact %}
+
+    {% if hide_header %}
+    <div id="header_container" class="header_hidden">
+    {% else %}
+    <div id="header_container" class="header_shown">
+    {% endif %}
+      <!-- The SVGs below are from Google Material Icons, licensing:
+           SPDX-FileCopyrightText: Google
+           SPDX-License-Identifier: Apache-2.0 -->
+      <svg id="header_hide" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="20px" fill="#000000"
+           class="pointer" onclick="onHideHeaderClick(event)">
+        <title>Hide the header</title>
+        <path d="m296-224-56-56 240-240 240 240-56 56-184-183-184 183Zm0-240-56-56 240-240 240 240-56 56-184-183-184 183Z"/>
+      </svg>
+      <svg id="header_show" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="20px" fill="#000000"
+           class="pointer" onclick="onShowHeaderClick(event)">
+        <title>Show the header</title>
+        <path d="M480-200 240-440l56-56 184 183 184-183 56 56-240 240Zm0-240L240-680l56-56 184 183 184-183 56 56-240 240Z"/>
+      </svg>
+    {% else %}
+    <div id="header_container">
+    {% endif %}
       <div id="header">
         <noscript>
           <div style="width:100%">
@@ -28,8 +88,8 @@ SPDX-License-Identifier: LGPL-3.0-or-later
         </noscript>
         <div id="main_header">
           <div id="header_left">
-            <div><h1>{{ title }}</h1></div>
-            <div><i>{{ version }}. &#169; CERN. Core licensed under GNU LGPL v3+.</i></div>
+            <div><h1 id="main_title">{{ title }}</h1></div>
+            <div><i id="copyright">{{ version }}. &#169; CERN. Core licensed under GNU LGPL v3+.</i></div>
           </div>
           <div id="header_right">
             <select name="results" id="results_combobox" autocomplete="off">
@@ -40,7 +100,36 @@ SPDX-License-Identifier: LGPL-3.0-or-later
               <option value="{{ x.value }}" data-label="{{ x.label }}">{{ x }}</option>
               {% endfor %}
             </select>
-            <!-- The two SVGs below are from Google Material Icons, licensing:
+            {% if compact %}
+            <!-- The SVG below is from Google Material Icons, licensing:
+                 SPDX-FileCopyrightText: Google
+                 SPDX-License-Identifier: Apache-2.0 -->
+            {% if session %}
+            <a href="/?session={{ session }}" target="_blank" id="home">
+            {% elif arrgmt %}
+            <a href="/?arrgmt={{ arrgmt }}" target="_blank" id="home">
+            {% else %}
+            <a href="/" target="_blank" id="home">
+            {% endif %}
+              <svg xmlns="http://www.w3.org/2000/svg" width="32px" height="32px"
+                   viewBox="0 -960 960 960" width="32px" fill="#000000">
+                <title>Open Adaptyst Analyser in standard mode</title>
+                <path d="M226.67-186.67h140v-246.66h226.66v246.66h140v-380L480-756.67l-253.33 190v380ZM160-120v-480l320-240 320 240v480H526.67v-246.67h-93.34V-120H160Zm320-352Z"/>
+              </svg>
+            </a>
+            {% endif %}
+            {% if not compact or session or arrgmt %}
+            <!-- The SVG below is from Google Material Icons, licensing:
+                 SPDX-FileCopyrightText: Google
+                 SPDX-License-Identifier: Apache-2.0 -->
+            <svg xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 -960 960 960" width="32px" fill="#000000"
+                 class="pointer" onclick="onOpenClick(event)">
+              <title>Open a saved arrangement</title>
+              <path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640H447l-80-80H160v480l96-320h684L837-217q-8 26-29.5 41.5T760-160H160Zm84-80h516l72-240H316l-72 240Zm0 0 72-240-72 240Zm-84-400v-80 80Z"/>
+            </svg>
+            {% endif %}
+            {% if not compact %}
+            <!-- The SVG below is from Google Material Icons, licensing:
                  SPDX-FileCopyrightText: Google
                  SPDX-License-Identifier: Apache-2.0 -->
             <svg id="refresh"
@@ -50,6 +139,16 @@ SPDX-License-Identifier: LGPL-3.0-or-later
               <title>Refresh the session</title>
               <path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z"/>
             </svg>
+            {% endif %}
+            {% if not compact or session or arrgmt %}
+            <!-- The SVGs below are from Google Material Icons, licensing:
+                 SPDX-FileCopyrightText: Google
+                 SPDX-License-Identifier: Apache-2.0 -->
+            <svg id="share" xmlns="http://www.w3.org/2000/svg" height="32px" viewBox="0 -960 960 960" width="32px" fill="#000000"
+                 class="disabled" onclick="">
+              <title>Share</title>
+              <path d="M684-80q-48.33 0-82.17-33.83Q568-147.67 568-196q0-7.33 4.33-32l-293-171.33q-16.18 16.56-37.42 25.94Q220.67-364 196-364q-48.33 0-82.17-33.67Q80-431.33 80-480t33.83-82.33Q147.67-596 196-596q24 0 45 9.03T278-562l294.33-170q-2-7.67-3.16-15.5Q568-755.33 568-764q0-48.33 33.83-82.17Q635.67-880 684-880t82.17 33.83Q800-812.33 800-764t-33.83 82.17Q732.33-648 684-648q-23.52 0-44.09-8.83-20.58-8.84-36.58-23.84L307-513.33q2.67 7.66 3.83 16.16 1.17 8.5 1.17 16.84 0 8.33-.83 15.5-.84 7.16-2.84 14.83L604-280q16-15 36.4-23.5 20.39-8.5 43.7-8.5 48.57 0 82.23 33.83Q800-244.33 800-196t-33.83 82.17Q732.33-80 684-80Zm.02-66.67q20.98 0 35.15-14.19 14.16-14.19 14.16-35.16 0-20.98-14.19-35.15-14.19-14.16-35.16-14.16-20.98 0-35.15 14.19-14.16 14.19-14.16 35.16 0 20.98 14.19 35.15 14.19 14.16 35.16 14.16Zm-488-284q20.98 0 35.15-14.19 14.16-14.19 14.16-35.16 0-20.98-14.19-35.15-14.19-14.16-35.16-14.16-20.98 0-35.15 14.19-14.16 14.19-14.16 35.16 0 20.98 14.19 35.15 14.19 14.16 35.16 14.16Zm523.15-298.19q14.16-14.19 14.16-35.16 0-20.98-14.19-35.15-14.19-14.16-35.16-14.16-20.98 0-35.15 14.19-14.16 14.19-14.16 35.16 0 20.98 14.19 35.15 14.19 14.16 35.16 14.16 20.98 0 35.15-14.19ZM684-196ZM196-480Zm488-284Z"/>
+            </svg>
             <svg id="settings_settings"
                  xmlns="http://www.w3.org/2000/svg" height="32px"
                  viewBox="0 -960 960 960" width="32px" fill="#000000"
@@ -57,20 +156,79 @@ SPDX-License-Identifier: LGPL-3.0-or-later
               <title>Settings</title>
               <path d="m388-80-20-126q-19-7-40-19t-37-25l-118 54-93-164 108-79q-2-9-2.5-20.5T185-480q0-9 .5-20.5T188-521L80-600l93-164 118 54q16-13 37-25t40-18l20-127h184l20 126q19 7 40.5 18.5T669-710l118-54 93 164-108 77q2 10 2.5 21.5t.5 21.5q0 10-.5 21t-2.5 21l108 78-93 164-118-54q-16 13-36.5 25.5T592-206L572-80H388Zm48-60h88l14-112q33-8 62.5-25t53.5-41l106 46 40-72-94-69q4-17 6.5-33.5T715-480q0-17-2-33.5t-7-33.5l94-69-40-72-106 46q-23-26-52-43.5T538-708l-14-112h-88l-14 112q-34 7-63.5 24T306-642l-106-46-40 72 94 69q-4 17-6.5 33.5T245-480q0 17 2.5 33.5T254-413l-94 69 40 72 106-46q24 24 53.5 41t62.5 25l14 112Zm44-210q54 0 92-38t38-92q0-54-38-92t-92-38q-54 0-92 38t-38 92q0 54 38 92t92 38Zm0-130Z"/>
             </svg>
+            {% endif %}
           </div>
         </div>
       </div>
-      <div id="block" class="scrollable">
-        
+      {% if compact %}
+      <div id="tabs">
+        <div id="tabs_content">
+          {% if session or arrgmt %}
+          <div id="main_tab" class="window_header" title="System graph (empty: no session opened))"
+               onclick="openSystemGraph()">
+            <i id="main_tab_title">System graph (empty: no session opened)</i>
+            <div class="window_buttons">
+              <!-- This SVG is from Google Material Icons, licensing:
+                   SPDX-FileCopyrightText: Google
+                   SPDX-License-Identifier: Apache-2.0 -->
+              <svg id="refresh" xmlns="http://www.w3.org/2000/svg" class="window_refresh disabled"
+                   viewBox="0 -960 960 960" onmousedown="Window.stopPropagation(event)">
+                <title>Reset/Refresh contents</title>
+                <path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z"/>
+              </svg>
+            </div>
+          </div>
+          {% else %}
+          <b style="color:red">Invalid URL error: in compact mode, you must specify in the URL an <u>existing</u> session/arrangement you want to open!</b>
+          {% endif %}
+        </div>
       </div>
+      {% endif %}
+      </div>
+      <div id="block" class="scrollable">
+        <div id="graph">
+
+        </div>
+      </div>
+      {% if compact %}
+
+      {% if hide_footer %}
+      <div id="footer" class="footer_hidden">
+      {% else %}
+      <div id="footer" class="footer_shown">
+      {% endif %}
+
+      <!-- The SVGs below are from Google Material Icons, licensing:
+           SPDX-FileCopyrightText: Google
+           SPDX-License-Identifier: Apache-2.0 -->
+      <svg id="footer_show" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="20px" fill="#000000"
+           class="pointer" onclick="onShowFooterClick(event)">
+        <title>Show the footer</title>
+        <path d="m296-224-56-56 240-240 240 240-56 56-184-183-184 183Zm0-240-56-56 240-240 240 240-56 56-184-183-184 183Z"/>
+      </svg>
+      <svg id="footer_hide" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="20px" fill="#000000"
+           class="pointer" onclick="onHideFooterClick(event)">
+        <title>Hide the footer</title>
+        <path d="M480-200 240-440l56-56 184 183 184-183 56 56-240 240Zm0-240L240-680l56-56 184 183 184-183 56 56-240 240Z"/>
+      </svg>
+
+      {% else %}
       <div id="footer">
+      {% endif %}
         <div id="loading">
           <img class="loading_image" src="{{ url_for('static', filename='loading.svg') }}"
                alt="Please wait..." title="Please wait..." width="32px" height="32px" />
         </div>
+        {% if compact %}
+        <span id="footer_pinned_text">
+          Welcome to Adaptyst Analyser in compact mode! You can switch between tabs by clicking one of them at the top. Hover over a tab to see what operations you can do on it. The blue tab is pinned and has the system graph of the session, a black tab is the non-system-graph one open at the moment (if any), and all other tabs are grey.
+        </span>
+        <span id="footer_text">The system graph tab is empty because no session is opened.</span>
+        {% else %}
         <span id="footer_text">
           Welcome to Adaptyst Analyser! Select a performance analysis session in the combobox at the top to start.
         </span>
+        {% endif %}
       </div>
     </div>
 

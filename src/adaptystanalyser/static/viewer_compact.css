@@ -1,0 +1,191 @@
+/*
+SPDX-FileCopyrightText: 2026 CERN
+SPDX-License-Identifier: LGPL-3.0-or-later
+*/
+
+html {
+    overflow:hidden;
+}
+
+body {
+    margin:0;
+    height:100%;
+    width:100%;
+}
+
+#main {
+    margin:0;
+    box-sizing:border-box;
+    height:100%;
+    width:100%;
+}
+
+#main_title {
+    font-size:16px;
+}
+
+#copyright {
+    font-size:14px;
+}
+
+#footer {
+    font-size:14px;
+    flex-direction:column;
+    position:relative;
+}
+
+#tabs {
+    border-bottom-style:double;
+    border-bottom-color:gray;
+    border-bottom-width:3px;
+    overflow-x:auto;
+    white-space:nowrap;
+    min-height:50px;
+    height:50px;
+    display:flex;
+    align-items:center;
+    padding-left:10px;
+    padding-right:10px;
+}
+
+#tabs_content {
+    flex-grow:1;
+}
+
+.window_header {
+    display:inline-block;
+    background-color:black;
+    color:white;
+    fill:white;
+    padding:5px;
+    cursor:pointer;
+    min-width:300px;
+    width:300px;
+    font-size:14px;
+    margin-right:5px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    border-style:solid;
+    border-color:black;
+    border-width:1px;
+    position:relative;
+    vertical-align:middle;
+}
+
+#main_tab {
+    background-color:darkblue;
+}
+
+.window_buttons {
+    position:absolute;
+    padding:inherit;
+    box-sizing:border-box;
+    height:100%;
+    top:0;
+    right:0;
+    background-color:black;
+    border-left-color:white;
+    border-left-width:1px;
+    border-left-style:solid;
+}
+
+#main_tab .window_buttons {
+    background-color:darkblue;
+}
+
+.window_refresh, .window_share, .window_edit_title, .window_close {
+    min-height:100%;
+    max-height:100%;
+}
+
+.window_visibility {
+    display:none;
+}
+
+.window_header:not(:hover) > .window_buttons {
+    display:none;
+}
+
+.window {
+    display:flex;
+    flex-direction:column;
+    box-sizing:border-box;
+    border-style:solid;
+    border-color:black;
+    border-width:2px;
+    overflow:hidden;
+    height:100%;
+    width:100%;
+    min-width:250px;
+    min-height:50px;
+}
+
+#results_combobox {
+    display:none;
+}
+
+#footer_pinned_text {
+    width:100%;
+}
+
+#footer_text {
+    padding-top:7px;
+    display:none;
+}
+
+#footer_show {
+    position:absolute;
+    top:-24px;
+}
+
+#footer_hide {
+    position:absolute;
+    top:-24px;
+}
+
+.footer_hidden {
+    height:0 !important;
+    padding:0 !important;
+    max-height:0 !important;
+}
+
+.footer_hidden > #footer_hide {
+    display:none;
+}
+
+.footer_shown > #footer_show {
+    display:none;
+}
+
+#header_show {
+    position:absolute;
+    bottom:-22px;
+    left:50%;
+    transform:translate(-50%, 0);
+}
+
+#header_hide {
+    position:absolute;
+    bottom:-22px;
+    left:50%;
+    transform:translate(-50%, 0);
+}
+
+.header_hidden > #header_hide {
+    display:none;
+}
+
+.header_shown > #header_show {
+    display:none;
+}
+
+.header_hidden {
+    #tabs, #copyright, #header_right {
+        display:none;
+    }
+
+    #main_title {
+        font-size:14px;
+        margin:0;
+    }
+}

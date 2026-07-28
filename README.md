@@ -26,12 +26,7 @@ The installation instructions can be found at the Adaptyst website [here](https:
 GitHub Issues are retired in this repository. Please use [our Jira issue tracker](https://adaptyst.web.cern.ch/issue-tracker) and/or [forum](https://adaptyst-forum.web.cern.ch) instead (you can use your GitHub account there).
 
 ## Third-party libraries used
-Python:
-* [Jinja](https://jinja.palletsprojects.com/en/stable)
-* [Flask](https://flask.palletsprojects.com)
-* [Gunicorn](https://gunicorn.org)
-* [pytest](https://docs.pytest.org/en/stable)
-* [pytest-mock](https://github.com/pytest-dev/pytest-mock)
+Python: Please see `dependencies` in pyproject.toml.
 
 JavaScript:
 * [jQuery](https://jquery.com)
