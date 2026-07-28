@@ -49,7 +49,7 @@ js-docs-gen:
   stage: docs
   before_script:
     - apt-get update
-    - apt-get install -y nodejs
+    - apt-get install -y npm
     - npm install -g jsdoc
   script:
     - cd docs/javascript
