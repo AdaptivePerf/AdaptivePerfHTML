@@ -3,7 +3,7 @@ version = 1
 [[annotations]]
 path = [
         ".gitignore",
-        "docs/config.json"
+        "docs/javascript/config.json"
 ]
 SPDX-FileCopyrightText = "2026 CERN"
 SPDX-License-Identifier = "CC0-1.0"
