@@ -65,7 +65,7 @@ python-docs-gen:
   stage: docs
   before_script:
     - pip install -U sphinx
-    - git tag v0.0.0.ci
+    - git tag v0.0.0
     - pip install $CI_PROJECT_DIR
   script:
     - sphinx-build -b html docs/python docs/python/_build
