@@ -230,7 +230,7 @@ class Module(ABC):
 
         :param data: Data supplied in the POST request in form
                      of a dictionary storing form fields (e.g.
-                     field ```xyz=abc``` is stored as
+                     field ``xyz=abc`` is stored as
                      ``data['xyz'] = 'abc'``.
         """
         pass
@@ -797,7 +797,10 @@ class Session:
         Process a POST request addressed to a module in the session
         and return the response produced by the module.
 
-        :param data: Data supplied in the POST request.
+        :param data: Data supplied in the POST request in form of a
+                     dictionary storing form fields (e.g. field
+                     ``xyz=abc`` is stored as
+                     ``data['xyz'] = 'abc'``).
         :param str entity: Name of the target entity.
         :param str analysable: Name of the target analysable.
         :param str module: Name of the target module.
