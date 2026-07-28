@@ -84,8 +84,8 @@ class Context:
     def save(self, name: str, data: str, storage_path: Path) \
             -> (str, str):
         """
-        Save a new window arrangement in the database and returns
-        a tuple (<arrangement identifier>, <arrangement update token>).
+        Save a new window arrangement in the database and return
+        a tuple ``(<arrangement identifier>, <arrangement update token>)``.
 
         :param str name: The name of the arrangement.
         :param str data: The JSON data describing the arrangement.
@@ -267,12 +267,12 @@ class Context:
 
     def get_list(self, search, limit, page, sort, types):
         """
-        Queries the saved arrangements and returns information
+        Query the saved arrangements and return information
         necessary for displaying the query results with pagination:
-        a tuple (<number of all arrangements matching the query>,
+        a tuple ``(<number of all arrangements matching the query>,
         <total number of arrangement pages matching the query>,
         <list of arrangements in form of dictionaries obtained by
-        Arrangement.to_dict()>).
+        Arrangement.to_dict()>)``.
 
         :param str search: A regular expression used to filter names.
                            Use None if you don't want to filter names.
