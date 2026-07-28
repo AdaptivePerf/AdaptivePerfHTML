@@ -7,6 +7,7 @@ import random
 import friendly_names
 from . import arrangements as arrgmts
 from abc import ABC, abstractmethod
+from functools import wraps
 from typing import Union
 from pathlib import Path
 from importlib import import_module
@@ -205,6 +206,7 @@ class Module(ABC):
 
         :param callable method: Module method to decorate.
         """
+        @wraps(method)
         def load_internals_and_run(self, *args, **kwargs):
             self.load()
             return method(self, *args, **kwargs)
