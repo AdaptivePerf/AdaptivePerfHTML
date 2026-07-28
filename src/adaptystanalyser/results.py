@@ -224,8 +224,8 @@ class Module(ABC):
     def process_post_request(self, data):
         """
         Process a POST request addressed to the module.
-        The return value must be either a (<response data>,
-        <HTTP status code>) tuple or just response data (the
+        The return value must be either a ``(<response data>,
+        <HTTP status code>)`` tuple or just response data (the
         200 HTTP status code is assumed then).
 
         :param data: Data supplied in the POST request.
@@ -911,7 +911,7 @@ class Window(ABC):
 
         Optionally, if return_session_storage_paths is set to True,
         a set of parent paths of sessions used by the window(s) is also
-        returned (the return value is a (<data>, <paths>) tuple then).
+        returned (the return value is a ``(<data>, <paths>)`` tuple then).
 
         :param windows: Window or list of windows to serialise. If you
                         provide a single window, a single window arrangement
@@ -1046,10 +1046,10 @@ class Window(ABC):
         """
         Save an arrangement in the database.
 
-        If no name is supplied, a tuple (<arrangement identifier>,
+        If no name is supplied, a tuple ``(<arrangement identifier>,
         <arrangement update token>, <random human-friendly arrangement
-        name>) is returned. Otherwise, the return value is a tuple
-        (<arrangement identifier>, <arrangement update token>).
+        name>)`` is returned. Otherwise, the return value is a tuple
+        ``(<arrangement identifier>, <arrangement update token>)``.
 
         :param windows: Window or list of windows to save. If you
                         provide a single window, a single window arrangement
@@ -1286,7 +1286,8 @@ class Window(ABC):
 
         :param x: Fallback horizontal position of the window in pixels.
         :param y: Fallback vertical position of the window in pixels.
-        :param bool collapsed: Override collapsed state of the window.
+        :param bool collapsed: Explicit collapsed state of the window overriding
+                               whatever has been set before.
         """
         to_return = {
             'id': self.get_id(),
