@@ -22,26 +22,28 @@ reuse-lint:
   script:
     - reuse lint
 
-# docker-build:
-#   image:
-#     name: gcr.io/kaniko-project/executor:debug
-#     entrypoint: [""]
-#   stage: build
-#   script:
-#     # Prepare Kaniko configuration file
-#     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_DEPLOY_USER\",\"password\":\"$CI_DEPLOY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-#     # Build and push the image from the Dockerfile at the root of the project.
-#     - |
-#       if [[ "$CI_COMMIT_TAG" != "" ]]; then
-#         IMAGE_DESTINATION=gitlab-registry.cern.ch/adaptyst/adaptyst-analyser:latest
-#         IMAGE_DESTINATION_NAMED=gitlab-registry.cern.ch/adaptyst/adaptyst-analyser:$CI_COMMIT_TAG
-#         /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $IMAGE_DESTINATION --destination $IMAGE_DESTINATION_NAMED
-#       else
-#         IMAGE_DESTINATION=gitlab-registry.cern.ch/adaptyst/adaptyst-analyser:branch-$CI_COMMIT_BRANCH
-#         /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $IMAGE_DESTINATION
-#       fi
-#     # Print the full registry path of the pushed image
-#     - echo "Image pushed successfully to ${IMAGE_DESTINATION}"
+docker-build:
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  stage: build
+  variables:
+    GIT_DEPTH: "0"
+  script:
+    # Prepare Kaniko configuration file
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_DEPLOY_USER\",\"password\":\"$CI_DEPLOY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Build and push the image from the Dockerfile at the root of the project.
+    - |
+      if [[ "$CI_COMMIT_TAG" != "" ]]; then
+        IMAGE_DESTINATION=gitlab-registry.cern.ch/adaptyst/adaptyst-analyser:latest
+        IMAGE_DESTINATION_NAMED=gitlab-registry.cern.ch/adaptyst/adaptyst-analyser:$CI_COMMIT_TAG
+        /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $IMAGE_DESTINATION --destination $IMAGE_DESTINATION_NAMED
+      else
+        IMAGE_DESTINATION=gitlab-registry.cern.ch/adaptyst/adaptyst-analyser:branch-$CI_COMMIT_BRANCH
+        /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $IMAGE_DESTINATION
+      fi
+    # Print the full registry path of the pushed image
+    - echo "Image pushed successfully to ${IMAGE_DESTINATION}"
 
 js-docs-gen:
   image:
@@ -63,9 +65,10 @@ python-docs-gen:
   image:
     name: registry.cern.ch/docker.io/python:latest
   stage: docs
+  variables:
+    GIT_DEPTH: "0"
   before_script:
     - pip install -U sphinx
-    - git tag v0.0.0
     - pip install $CI_PROJECT_DIR
   script:
     - sphinx-build -b html docs/python docs/python/_build
