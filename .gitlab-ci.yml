@@ -3,8 +3,9 @@
 
 workflow:
   rules:
-    - if: $CI_PIPELINE_SOURCE == "external_pull_request_event" || $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "web"
     - if: $CI_COMMIT_TAG != null
+    - if: $CI_COMMIT_BRANCH == "dev"
 
 # Most of the content below is based on https://gitlab.cern.ch/gitlabci-examples/build_docker_image/-/blob/master/.gitlab-ci.yml
 stages:
