@@ -298,6 +298,7 @@ object {
     border-bottom-color:gray;
     border-bottom-width:3px;
     padding-bottom:5px;
+    gap:5px;
 }
 
 .window_space {
